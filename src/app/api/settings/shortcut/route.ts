@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import plist from "plist";
+import plist, { PlistValue } from "plist";
 
 function buildShortcutPlist(apiKey: string, baseUrl: string) {
   return {
@@ -189,7 +189,7 @@ export async function GET() {
     process.env.NEXT_PUBLIC_APP_URL || "https://your-app.vercel.app";
 
   const shortcutData = buildShortcutPlist(user.apiKey, baseUrl);
-  const xml = plist.build(shortcutData);
+  const xml = plist.build(shortcutData as unknown as PlistValue);
 
   return new NextResponse(xml, {
     headers: {

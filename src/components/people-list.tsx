@@ -6,7 +6,7 @@ type Person = {
   company: string | null;
   role: string | null;
   source: string | null;
-  updatedAt: string;
+  updatedAt: Date | string;
 };
 
 export function PeopleList({ people }: { people: Person[] }) {
