@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 
 const SHORTCUT_ICLOUD_URL =
-  "https://www.icloud.com/shortcuts/f7d359d6c3924fd994ef426f7def813a";
+  "https://www.icloud.com/shortcuts/9d6c7110dbd140088d99556ef4913ab3";
 
 export default function SettingsPage() {
   const [apiKey, setApiKey] = useState<string | null>(null);
