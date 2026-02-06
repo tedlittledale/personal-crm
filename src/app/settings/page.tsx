@@ -10,7 +10,7 @@ export default function SettingsPage() {
   const [revealed, setRevealed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
-  const [copied, setCopied] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const fetchApiKey = useCallback(async () => {
     try {
@@ -51,18 +51,16 @@ export default function SettingsPage() {
     }
   }
 
-  async function handleCopy(text: string, label: string) {
-    await navigator.clipboard.writeText(text);
-    setCopied(label);
-    setTimeout(() => setCopied(null), 2000);
+  async function handleCopy() {
+    if (!apiKey) return;
+    await navigator.clipboard.writeText(apiKey);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
 
   const maskedKey = apiKey
     ? `${apiKey.slice(0, 6)}${"*".repeat(20)}${apiKey.slice(-4)}`
     : "";
-
-  const serverUrl =
-    typeof window !== "undefined" ? window.location.origin : "";
 
   return (
     <div className="space-y-8">
@@ -77,34 +75,10 @@ export default function SettingsPage() {
           text to this shortcut.
         </p>
 
-        <a
-          href={SHORTCUT_ICLOUD_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
-        >
-          Install Shortcut
-        </a>
-
         <p className="text-sm text-muted-foreground">
-          When installing, you&rsquo;ll be asked to enter the values below.
+          First, copy your API key below. You&rsquo;ll need to paste it when
+          installing the shortcut.
         </p>
-
-        {/* Server URL */}
-        <div>
-          <label className="block text-sm font-medium mb-1">Server URL</label>
-          <div className="flex items-center gap-2">
-            <code className="flex-1 rounded-lg bg-muted px-3 py-2 text-sm font-mono truncate">
-              {serverUrl}
-            </code>
-            <button
-              onClick={() => handleCopy(serverUrl, "url")}
-              className="shrink-0 rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted transition-colors"
-            >
-              {copied === "url" ? "Copied!" : "Copy"}
-            </button>
-          </div>
-        </div>
 
         {/* API Key for shortcut setup */}
         <div>
@@ -123,10 +97,10 @@ export default function SettingsPage() {
                 {revealed ? "Hide" : "Reveal"}
               </button>
               <button
-                onClick={() => handleCopy(apiKey, "key")}
+                onClick={handleCopy}
                 className="shrink-0 rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted transition-colors"
               >
-                {copied === "key" ? "Copied!" : "Copy"}
+                {copied ? "Copied!" : "Copy"}
               </button>
             </div>
           ) : (
@@ -143,6 +117,15 @@ export default function SettingsPage() {
         >
           {regenerating ? "Regenerating..." : "Regenerate API key"}
         </button>
+
+        <a
+          href={SHORTCUT_ICLOUD_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+        >
+          Install Shortcut
+        </a>
       </section>
 
       {/* Instructions */}
@@ -150,8 +133,8 @@ export default function SettingsPage() {
         <h2 className="text-sm font-medium">How it works</h2>
         <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
           <li>
-            Tap &ldquo;Install Shortcut&rdquo; above and enter your Server URL
-            and API Key when prompted
+            Tap &ldquo;Install Shortcut&rdquo; above and enter your API Key
+            when prompted
           </li>
           <li>
             Record a voice note in your transcription app (e.g. Whisper Notes)
