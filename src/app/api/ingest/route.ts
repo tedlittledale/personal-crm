@@ -43,7 +43,13 @@ export async function POST(req: NextRequest) {
 
   try {
     // Extract structured data from transcript using Claude
-    const extractedData = await extractPersonFromTranscript(transcript);
+    // This first tidies the transcript (fixing misspellings, company names, etc.)
+    // then extracts structured person data from the cleaned version
+    const { tidiedTranscript, ...extractedFields } =
+      await extractPersonFromTranscript(transcript);
+
+    // Store tidied transcript alongside the extracted fields in the JSONB column
+    const extractedData = { ...extractedFields, tidiedTranscript };
 
     // Create pending review with 7-day expiry
     const expiresAt = new Date();
@@ -65,7 +71,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       reviewUrl,
-      extractedData,
+      extractedData: extractedFields,
     });
   } catch (err) {
     console.error("Ingest error:", err);

@@ -37,6 +37,7 @@ export default async function ReviewPage({
   }
 
   const extracted = (review.extractedData as Record<string, string | null>) || {};
+  const tidiedTranscript = extracted.tidiedTranscript;
 
   return (
     <div className="space-y-4">
@@ -46,6 +47,18 @@ export default async function ReviewPage({
           Check the information below and correct any mistakes before saving.
         </p>
       </div>
+
+      {/* Show tidied transcript (used for extraction) */}
+      {tidiedTranscript && (
+        <details className="rounded-lg border border-border" open>
+          <summary className="px-4 py-2 text-sm font-medium cursor-pointer hover:bg-muted transition-colors">
+            View cleaned transcript
+          </summary>
+          <div className="px-4 py-3 border-t border-border text-sm text-muted-foreground whitespace-pre-wrap">
+            {tidiedTranscript}
+          </div>
+        </details>
+      )}
 
       {/* Show original transcript collapsed */}
       <details className="rounded-lg border border-border">
