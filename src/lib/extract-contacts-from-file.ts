@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { z } from "zod";
 import { ExtractedPerson } from "./extract";
 
 function getClient() {
@@ -11,6 +12,49 @@ function getClient() {
   return new Anthropic({ apiKey });
 }
 
+// Schema for a single contact extracted by the AI.
+// Uses coerce/transform to handle AI returning slightly off shapes
+// (e.g. missing fields, empty strings instead of null, snake_case keys).
+const contactSchema = z
+  .object({
+    name: z.string().min(1),
+    company: z.string().nullable().optional(),
+    role: z.string().nullable().optional(),
+    personalDetails: z.string().nullable().optional(),
+    personal_details: z.string().nullable().optional(), // handle snake_case variant
+    notes: z.string().nullable().optional(),
+    source: z.string().nullable().optional(),
+    birthday: z.string().nullable().optional(),
+    children: z.string().nullable().optional(),
+  })
+  .transform(
+    (val): ExtractedPerson => ({
+      name: val.name.trim(),
+      company: val.company?.trim() || null,
+      role: val.role?.trim() || null,
+      personalDetails:
+        val.personalDetails?.trim() || val.personal_details?.trim() || null,
+      notes: val.notes?.trim() || null,
+      source: val.source?.trim() || null,
+      birthday: val.birthday?.trim() || null,
+      children: val.children?.trim() || null,
+    })
+  );
+
+// Schema for the full AI response -- an array of contacts.
+// Filters out entries that fail validation (e.g. missing name) rather than
+// throwing, so one bad row doesn't break the whole import.
+const contactsResponseSchema = z.array(z.unknown()).transform((items) => {
+  const results: ExtractedPerson[] = [];
+  for (const item of items) {
+    const parsed = contactSchema.safeParse(item);
+    if (parsed.success) {
+      results.push(parsed.data);
+    }
+  }
+  return results;
+});
+
 const EXTRACT_CONTACTS_PROMPT = `You are a data extraction assistant. Your job is to find ALL contacts/people mentioned in the provided file content and extract structured information about each one.
 
 The file content could be in any format: CSV, TSV, spreadsheet data, plain text notes, JSON, markdown, or any other format. Analyze the structure and extract every person you can find.
@@ -22,6 +66,8 @@ Return ONLY a valid JSON array of objects. Each object must have these fields:
 - personalDetails (string or null): Personal information like family, pets, hobbies, interests, preferences
 - notes (string or null): Any other relevant information that doesn't fit above
 - source (string or null): Where/how the user knows this person, or any context about the relationship
+- birthday (string or null): The person's birthday in YYYY-MM-DD format if available
+- children (string or null): Information about their children (names, ages, etc.)
 
 Rules:
 - Return ONLY the JSON array, no other text
@@ -61,23 +107,14 @@ export async function extractContactsFromFile(
     .replace(/```json?\n?/g, "")
     .replace(/```\n?/g, "")
     .trim();
-  const parsed = JSON.parse(cleaned);
 
-  if (!Array.isArray(parsed)) {
+  const raw = JSON.parse(cleaned);
+
+  if (!Array.isArray(raw)) {
     throw new Error("AI response was not an array of contacts");
   }
 
-  return parsed.map(
-    (entry: Record<string, unknown>): ExtractedPerson => ({
-      name: (entry.name as string) || "Unknown",
-      company: (entry.company as string) || null,
-      role: (entry.role as string) || null,
-      personalDetails:
-        (entry.personalDetails as string) ||
-        (entry.personal_details as string) ||
-        null,
-      notes: (entry.notes as string) || null,
-      source: (entry.source as string) || null,
-    })
-  );
+  // Validate and transform through the schema -- malformed entries are
+  // silently dropped rather than crashing the whole import.
+  return contactsResponseSchema.parse(raw);
 }

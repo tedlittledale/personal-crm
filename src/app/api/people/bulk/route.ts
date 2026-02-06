@@ -46,6 +46,8 @@ export async function POST(req: NextRequest) {
         personalDetails?: string | null;
         notes?: string | null;
         source?: string | null;
+        birthday?: string | null;
+        children?: string | null;
       }) => ({
         userId,
         name: c.name.trim(),
@@ -54,6 +56,8 @@ export async function POST(req: NextRequest) {
         personalDetails: c.personalDetails?.trim() || null,
         notes: c.notes?.trim() || null,
         source: c.source?.trim() || null,
+        birthday: c.birthday?.trim() || null,
+        children: c.children?.trim() || null,
       })
     );
 

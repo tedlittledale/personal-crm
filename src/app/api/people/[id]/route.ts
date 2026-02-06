@@ -36,7 +36,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
   const { id } = await params;
   const body = await req.json();
-  const { name, company, role, personalDetails, notes, source } = body;
+  const { name, company, role, personalDetails, notes, source, birthday, children } = body;
 
   if (name !== undefined && (typeof name !== "string" || name.trim().length === 0)) {
     return NextResponse.json({ error: "Name cannot be empty" }, { status: 400 });
@@ -61,6 +61,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
       ...(personalDetails !== undefined && { personalDetails: personalDetails?.trim() || null }),
       ...(notes !== undefined && { notes: notes?.trim() || null }),
       ...(source !== undefined && { source: source?.trim() || null }),
+      ...(birthday !== undefined && { birthday: birthday?.trim() || null }),
+      ...(children !== undefined && { children: children?.trim() || null }),
       updatedAt: new Date(),
     })
     .where(eq(people.id, id))

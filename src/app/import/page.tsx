@@ -10,6 +10,8 @@ type ExtractedContact = {
   personalDetails: string | null;
   notes: string | null;
   source: string | null;
+  birthday: string | null;
+  children: string | null;
 };
 
 type ContactRow = ExtractedContact & {
@@ -305,6 +307,17 @@ export default function ImportPage() {
                           value={contact.source || ""}
                           onChange={(v) => updateContact(i, "source", v)}
                         />
+                        <EditField
+                          label="Birthday"
+                          value={contact.birthday || ""}
+                          onChange={(v) => updateContact(i, "birthday", v)}
+                          type="date"
+                        />
+                        <EditField
+                          label="Children"
+                          value={contact.children || ""}
+                          onChange={(v) => updateContact(i, "children", v)}
+                        />
                         <button
                           onClick={() => toggleEdit(i)}
                           className="text-xs text-primary hover:underline"
@@ -338,6 +351,16 @@ export default function ImportPage() {
                         {contact.notes && (
                           <p className="text-xs text-muted-foreground mt-1">
                             {contact.notes}
+                          </p>
+                        )}
+                        {contact.birthday && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Birthday: {contact.birthday}
+                          </p>
+                        )}
+                        {contact.children && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Children: {contact.children}
                           </p>
                         )}
                         {contact.source && (
@@ -431,11 +454,13 @@ function EditField({
   value,
   onChange,
   multiline = false,
+  type = "text",
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   multiline?: boolean;
+  type?: string;
 }) {
   return (
     <div>
@@ -451,7 +476,7 @@ function EditField({
         />
       ) : (
         <input
-          type="text"
+          type={type}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           className="w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"

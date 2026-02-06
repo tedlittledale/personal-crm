@@ -79,6 +79,8 @@ export default async function ReviewPage({
           personalDetails: extracted.personalDetails || extracted.personal_details || null,
           notes: extracted.notes || null,
           source: extracted.source || null,
+          birthday: extracted.birthday || null,
+          children: extracted.children || null,
         }}
       />
     </div>

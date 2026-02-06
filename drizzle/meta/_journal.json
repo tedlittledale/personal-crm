@@ -8,6 +8,13 @@
       "when": 1770327798544,
       "tag": "0000_even_baron_zemo",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1770409306005,
+      "tag": "0001_gigantic_the_fallen",
+      "breakpoints": true
     }
   ]
 }

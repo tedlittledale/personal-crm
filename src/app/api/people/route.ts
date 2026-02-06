@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
   await ensureUser(userId);
 
   const body = await req.json();
-  const { name, company, role, personalDetails, notes, source } = body;
+  const { name, company, role, personalDetails, notes, source, birthday, children } = body;
 
   if (!name || typeof name !== "string" || name.trim().length === 0) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
@@ -57,6 +57,8 @@ export async function POST(req: NextRequest) {
         personalDetails: personalDetails?.trim() || null,
         notes: notes?.trim() || null,
         source: source?.trim() || null,
+        birthday: birthday?.trim() || null,
+        children: children?.trim() || null,
       })
       .returning();
 

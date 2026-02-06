@@ -17,6 +17,8 @@ export type ExtractedPerson = {
   personalDetails: string | null;
   notes: string | null;
   source: string | null;
+  birthday: string | null;
+  children: string | null;
 };
 
 const TIDY_PROMPT = `You are a transcript editor. Your job is to clean up a raw voice note transcript and return a corrected version. Return ONLY the cleaned transcript text, nothing else.
@@ -40,6 +42,8 @@ The JSON must have these fields:
 - personalDetails (string or null): Personal information like family, pets, hobbies, interests, preferences
 - notes (string or null): Any other relevant information that doesn't fit above
 - source (string or null): Where/how the speaker met this person (event, introduction, context)
+- birthday (string or null): The person's birthday in YYYY-MM-DD format if mentioned
+- children (string or null): Information about their children (names, ages, etc.)
 
 If a field isn't mentioned in the transcript, set it to null. Write in clear, concise language.`;
 
@@ -98,6 +102,8 @@ export async function extractPersonFromTranscript(
     personalDetails: parsed.personalDetails || parsed.personal_details || null,
     notes: parsed.notes || null,
     source: parsed.source || null,
+    birthday: parsed.birthday || null,
+    children: parsed.children || null,
     tidiedTranscript,
   };
 }

@@ -5,6 +5,7 @@ import {
   uuid,
   jsonb,
   index,
+  date,
 } from "drizzle-orm/pg-core";
 
 // Users table - synced from Clerk via webhook
@@ -28,6 +29,8 @@ export const people = pgTable(
     personalDetails: text("personal_details"),
     notes: text("notes"),
     source: text("source"),
+    birthday: date("birthday"),
+    children: text("children"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },

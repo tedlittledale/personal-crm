@@ -10,6 +10,8 @@ type ReviewData = {
   personalDetails: string | null;
   notes: string | null;
   source: string | null;
+  birthday: string | null;
+  children: string | null;
 };
 
 export function ReviewForm({
@@ -36,6 +38,8 @@ export function ReviewForm({
       personalDetails: formData.get("personalDetails") as string,
       notes: formData.get("notes") as string,
       source: formData.get("source") as string,
+      birthday: formData.get("birthday") as string,
+      children: formData.get("children") as string,
     };
 
     try {
@@ -125,6 +129,34 @@ export function ReviewForm({
           defaultValue={initialData.source ?? ""}
           className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
         />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label htmlFor="birthday" className="block text-sm font-medium mb-1">
+            Birthday
+          </label>
+          <input
+            id="birthday"
+            name="birthday"
+            type="date"
+            defaultValue={initialData.birthday ?? ""}
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
+          />
+        </div>
+        <div>
+          <label htmlFor="children" className="block text-sm font-medium mb-1">
+            Children
+          </label>
+          <input
+            id="children"
+            name="children"
+            type="text"
+            defaultValue={initialData.children ?? ""}
+            placeholder="e.g. Emma (8), Jack (5)"
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+          />
+        </div>
       </div>
 
       <div>
