@@ -26,6 +26,16 @@ export function Nav() {
               People
             </Link>
             <Link
+              href="/import"
+              className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
+                pathname === "/import"
+                  ? "bg-muted font-medium"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Import
+            </Link>
+            <Link
               href="/settings"
               className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
                 pathname === "/settings"

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 
 const SHORTCUT_ICLOUD_URL =
   "https://www.icloud.com/shortcuts/5c5a0a3d730a43699813cac9264c4c05";
@@ -11,6 +12,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const fetchApiKey = useCallback(async () => {
     try {
@@ -154,6 +156,37 @@ export default function SettingsPage() {
             mistakes and save
           </li>
         </ol>
+      </section>
+
+      {/* Data Management Section */}
+      <section className="space-y-4">
+        <h2 className="text-sm font-medium">Data Management</h2>
+        <p className="text-sm text-muted-foreground">
+          Import contacts from a file or export your contacts as a CSV backup.
+        </p>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/import"
+            className="inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+          >
+            Import contacts
+          </Link>
+          <button
+            onClick={async () => {
+              setExporting(true);
+              try {
+                window.location.href = "/api/export";
+              } finally {
+                // Small delay so user sees the feedback
+                setTimeout(() => setExporting(false), 1500);
+              }
+            }}
+            disabled={exporting}
+            className="inline-flex items-center rounded-lg border border-border px-4 py-2 text-sm hover:bg-muted transition-colors disabled:opacity-50"
+          >
+            {exporting ? "Exporting..." : "Export CSV"}
+          </button>
+        </div>
       </section>
     </div>
   );
