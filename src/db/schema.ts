@@ -5,13 +5,16 @@ import {
   uuid,
   jsonb,
   index,
-  date,
+  integer,
 } from "drizzle-orm/pg-core";
 
 // Users table - synced from Clerk via webhook
 export const users = pgTable("users", {
   id: text("id").primaryKey(), // Clerk user ID
   apiKey: text("api_key").notNull().unique(),
+  phone: text("phone"), // for future WhatsApp/Twilio
+  telegramChatId: text("telegram_chat_id").unique(),
+  telegramLinkToken: text("telegram_link_token"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -26,10 +29,13 @@ export const people = pgTable(
     name: text("name").notNull(),
     company: text("company"),
     role: text("role"),
+    email: text("email"),
+    phone: text("phone"),
     personalDetails: text("personal_details"),
     notes: text("notes"),
     source: text("source"),
-    birthday: date("birthday"),
+    birthdayMonth: integer("birthday_month"), // 1-12
+    birthdayDay: integer("birthday_day"), // 1-31
     children: text("children"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),

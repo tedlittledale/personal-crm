@@ -7,10 +7,13 @@ type ExtractedContact = {
   name: string;
   company: string | null;
   role: string | null;
+  email: string | null;
+  phone: string | null;
   personalDetails: string | null;
   notes: string | null;
   source: string | null;
-  birthday: string | null;
+  birthdayMonth: number | null;
+  birthdayDay: number | null;
   children: string | null;
 };
 
@@ -115,7 +118,11 @@ export default function ImportPage() {
   function updateContact(index: number, field: keyof ExtractedContact, value: string) {
     if (state.step !== "review") return;
     const contacts = [...state.contacts];
-    contacts[index] = { ...contacts[index], [field]: value || null };
+    let parsed: string | number | null = value || null;
+    if (field === "birthdayMonth" || field === "birthdayDay") {
+      parsed = value ? parseInt(value, 10) : null;
+    }
+    contacts[index] = { ...contacts[index], [field]: parsed };
     setState({ ...state, contacts });
   }
 
@@ -308,11 +315,45 @@ export default function ImportPage() {
                           onChange={(v) => updateContact(i, "source", v)}
                         />
                         <EditField
-                          label="Birthday"
-                          value={contact.birthday || ""}
-                          onChange={(v) => updateContact(i, "birthday", v)}
-                          type="date"
+                          label="Email"
+                          value={contact.email || ""}
+                          onChange={(v) => updateContact(i, "email", v)}
                         />
+                        <EditField
+                          label="Phone"
+                          value={contact.phone || ""}
+                          onChange={(v) => updateContact(i, "phone", v)}
+                        />
+                        <div>
+                          <label className="block text-xs font-medium text-muted-foreground mb-1">
+                            Birthday
+                          </label>
+                          <div className="flex gap-2">
+                            <select
+                              value={contact.birthdayMonth?.toString() ?? ""}
+                              onChange={(e) => updateContact(i, "birthdayMonth", e.target.value)}
+                              className="flex-1 rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                            >
+                              <option value="">Month</option>
+                              {[
+                                "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+                              ].map((m, idx) => (
+                                <option key={idx + 1} value={idx + 1}>{m}</option>
+                              ))}
+                            </select>
+                            <select
+                              value={contact.birthdayDay?.toString() ?? ""}
+                              onChange={(e) => updateContact(i, "birthdayDay", e.target.value)}
+                              className="w-20 rounded-md border border-border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                            >
+                              <option value="">Day</option>
+                              {Array.from({ length: 31 }, (_, idx) => (
+                                <option key={idx + 1} value={idx + 1}>{idx + 1}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
                         <EditField
                           label="Children"
                           value={contact.children || ""}
@@ -353,9 +394,9 @@ export default function ImportPage() {
                             {contact.notes}
                           </p>
                         )}
-                        {contact.birthday && (
+                        {(contact.birthdayMonth || contact.birthdayDay) && (
                           <p className="text-xs text-muted-foreground mt-1">
-                            Birthday: {contact.birthday}
+                            Birthday: {contact.birthdayMonth ? ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][contact.birthdayMonth - 1] : "?"} {contact.birthdayDay ?? "?"}
                           </p>
                         )}
                         {contact.children && (

@@ -40,20 +40,35 @@ export async function GET() {
     "Name",
     "Company",
     "Role",
+    "Email",
+    "Phone",
     "Personal Details",
     "Notes",
     "Source",
+    "Birthday Month",
+    "Birthday Day",
+    "Children",
     "Created",
     "Updated",
+  ];
+
+  const MONTH_NAMES = [
+    "", "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
   ];
 
   const rows = results.map((person) => [
     csvEscape(person.name),
     csvEscape(person.company),
     csvEscape(person.role),
+    csvEscape(person.email),
+    csvEscape(person.phone),
     csvEscape(person.personalDetails),
     csvEscape(person.notes),
     csvEscape(person.source),
+    csvEscape(person.birthdayMonth ? MONTH_NAMES[person.birthdayMonth] : null),
+    csvEscape(person.birthdayDay?.toString() ?? null),
+    csvEscape(person.children),
     csvEscape(
       person.createdAt instanceof Date
         ? person.createdAt.toISOString()
