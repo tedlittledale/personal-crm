@@ -20,6 +20,8 @@ export default function SettingsPage() {
   const [telegramLinking, setTelegramLinking] = useState(false);
   const [telegramDeepLink, setTelegramDeepLink] = useState<string | null>(null);
   const [telegramUnlinking, setTelegramUnlinking] = useState(false);
+  const [telegramError, setTelegramError] = useState<string | null>(null);
+  const [telegramCopied, setTelegramCopied] = useState(false);
 
   const fetchApiKey = useCallback(async () => {
     try {
@@ -82,14 +84,19 @@ export default function SettingsPage() {
 
   async function handleLinkTelegram() {
     setTelegramLinking(true);
+    setTelegramError(null);
     try {
       const res = await fetch("/api/settings/telegram/link", {
         method: "POST",
       });
+      const data = await res.json();
       if (res.ok) {
-        const data = await res.json();
         setTelegramDeepLink(data.deepLink);
+      } else {
+        setTelegramError(data.error || "Failed to generate link");
       }
+    } catch (err) {
+      setTelegramError("Network error. Please try again.");
     } finally {
       setTelegramLinking(false);
     }
@@ -161,11 +168,25 @@ export default function SettingsPage() {
               </a>
               <button
                 onClick={async () => {
-                  await navigator.clipboard.writeText(telegramDeepLink);
+                  try {
+                    await navigator.clipboard.writeText(telegramDeepLink);
+                    setTelegramCopied(true);
+                    setTimeout(() => setTelegramCopied(false), 2000);
+                  } catch {
+                    // Fallback: select text in a temp input
+                    const input = document.createElement("input");
+                    input.value = telegramDeepLink;
+                    document.body.appendChild(input);
+                    input.select();
+                    document.execCommand("copy");
+                    document.body.removeChild(input);
+                    setTelegramCopied(true);
+                    setTimeout(() => setTelegramCopied(false), 2000);
+                  }
                 }}
                 className="rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted transition-colors"
               >
-                Copy link
+                {telegramCopied ? "Copied!" : "Copy link"}
               </button>
             </div>
             <p className="text-xs text-muted-foreground">
@@ -181,6 +202,12 @@ export default function SettingsPage() {
           >
             {telegramLinking ? "Generating link..." : "Link Telegram"}
           </button>
+        )}
+
+        {telegramError && (
+          <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive">
+            {telegramError}
+          </div>
         )}
 
         <div className="text-xs text-muted-foreground space-y-1">
