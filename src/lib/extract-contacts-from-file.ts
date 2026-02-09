@@ -20,11 +20,16 @@ const contactSchema = z
     name: z.string().min(1),
     company: z.string().nullable().optional(),
     role: z.string().nullable().optional(),
+    email: z.string().nullable().optional(),
+    phone: z.string().nullable().optional(),
     personalDetails: z.string().nullable().optional(),
     personal_details: z.string().nullable().optional(), // handle snake_case variant
     notes: z.string().nullable().optional(),
     source: z.string().nullable().optional(),
-    birthday: z.string().nullable().optional(),
+    birthdayMonth: z.number().nullable().optional(),
+    birthday_month: z.number().nullable().optional(), // handle snake_case variant
+    birthdayDay: z.number().nullable().optional(),
+    birthday_day: z.number().nullable().optional(), // handle snake_case variant
     children: z.string().nullable().optional(),
   })
   .transform(
@@ -32,11 +37,14 @@ const contactSchema = z
       name: val.name.trim(),
       company: val.company?.trim() || null,
       role: val.role?.trim() || null,
+      email: val.email?.trim() || null,
+      phone: val.phone?.trim() || null,
       personalDetails:
         val.personalDetails?.trim() || val.personal_details?.trim() || null,
       notes: val.notes?.trim() || null,
       source: val.source?.trim() || null,
-      birthday: val.birthday?.trim() || null,
+      birthdayMonth: val.birthdayMonth ?? val.birthday_month ?? null,
+      birthdayDay: val.birthdayDay ?? val.birthday_day ?? null,
       children: val.children?.trim() || null,
     })
   );
@@ -63,10 +71,13 @@ Return ONLY a valid JSON array of objects. Each object must have these fields:
 - name (string, required): The person's full name
 - company (string or null): Where they work / their organization
 - role (string or null): Their job title or role
+- email (string or null): Their email address if available
+- phone (string or null): Their phone number if available
 - personalDetails (string or null): Personal information like family, pets, hobbies, interests, preferences
 - notes (string or null): Any other relevant information that doesn't fit above
 - source (string or null): Where/how the user knows this person, or any context about the relationship
-- birthday (string or null): The person's birthday in YYYY-MM-DD format if available
+- birthdayMonth (number or null): The month of their birthday (1-12) if available
+- birthdayDay (number or null): The day of their birthday (1-31) if available
 - children (string or null): Information about their children (names, ages, etc.)
 
 Rules:
@@ -75,6 +86,7 @@ Rules:
 - Every entry MUST have a name. Skip entries that don't have a name
 - Combine related information intelligently (e.g. if there are separate first/last name columns, merge them into "name")
 - If the data has columns/fields that don't map to the above fields, include that information in "notes"
+- For birthdays, only extract the month and day -- do NOT include the year
 - Write in clear, concise language
 - Do NOT invent or hallucinate information that isn't in the source data`;
 

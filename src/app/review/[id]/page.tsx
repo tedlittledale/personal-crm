@@ -76,10 +76,13 @@ export default async function ReviewPage({
           name: extracted.name || "",
           company: extracted.company || null,
           role: extracted.role || null,
+          email: extracted.email || null,
+          phone: extracted.phone || null,
           personalDetails: extracted.personalDetails || extracted.personal_details || null,
           notes: extracted.notes || null,
           source: extracted.source || null,
-          birthday: extracted.birthday || null,
+          birthdayMonth: Number(extracted.birthdayMonth ?? extracted.birthday_month) || null,
+          birthdayDay: Number(extracted.birthdayDay ?? extracted.birthday_day) || null,
           children: extracted.children || null,
         }}
       />

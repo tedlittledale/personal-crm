@@ -36,7 +36,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
   const { id } = await params;
   const body = await req.json();
-  const { name, company, role, personalDetails, notes, source, birthday, children } = body;
+  const { name, company, role, email, phone, personalDetails, notes, source, birthdayMonth, birthdayDay, children } = body;
 
   if (name !== undefined && (typeof name !== "string" || name.trim().length === 0)) {
     return NextResponse.json({ error: "Name cannot be empty" }, { status: 400 });
@@ -58,10 +58,13 @@ export async function PUT(req: NextRequest, { params }: Params) {
       ...(name !== undefined && { name: name.trim() }),
       ...(company !== undefined && { company: company?.trim() || null }),
       ...(role !== undefined && { role: role?.trim() || null }),
+      ...(email !== undefined && { email: email?.trim() || null }),
+      ...(phone !== undefined && { phone: phone?.trim() || null }),
       ...(personalDetails !== undefined && { personalDetails: personalDetails?.trim() || null }),
       ...(notes !== undefined && { notes: notes?.trim() || null }),
       ...(source !== undefined && { source: source?.trim() || null }),
-      ...(birthday !== undefined && { birthday: birthday?.trim() || null }),
+      ...(birthdayMonth !== undefined && { birthdayMonth: birthdayMonth ?? null }),
+      ...(birthdayDay !== undefined && { birthdayDay: birthdayDay ?? null }),
       ...(children !== undefined && { children: children?.trim() || null }),
       updatedAt: new Date(),
     })

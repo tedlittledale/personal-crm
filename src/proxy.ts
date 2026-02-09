@@ -5,6 +5,8 @@ const isPublicRoute = createRouteMatcher([
   "/sign-up(.*)",
   "/api/ingest", // API key auth, not Clerk session
   "/api/webhooks(.*)", // Clerk webhooks
+  "/api/telegram/webhook", // Telegram bot webhook
+  "/api/cron(.*)", // Cron endpoints (protected by CRON_SECRET)
 ]);
 
 export default clerkMiddleware(async (auth, req) => {

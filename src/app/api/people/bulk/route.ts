@@ -43,20 +43,26 @@ export async function POST(req: NextRequest) {
         name: string;
         company?: string | null;
         role?: string | null;
+        email?: string | null;
+        phone?: string | null;
         personalDetails?: string | null;
         notes?: string | null;
         source?: string | null;
-        birthday?: string | null;
+        birthdayMonth?: number | null;
+        birthdayDay?: number | null;
         children?: string | null;
       }) => ({
         userId,
         name: c.name.trim(),
         company: c.company?.trim() || null,
         role: c.role?.trim() || null,
+        email: c.email?.trim() || null,
+        phone: c.phone?.trim() || null,
         personalDetails: c.personalDetails?.trim() || null,
         notes: c.notes?.trim() || null,
         source: c.source?.trim() || null,
-        birthday: c.birthday?.trim() || null,
+        birthdayMonth: c.birthdayMonth ?? null,
+        birthdayDay: c.birthdayDay ?? null,
         children: c.children?.trim() || null,
       })
     );

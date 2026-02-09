@@ -14,10 +14,13 @@ export type ExtractedPerson = {
   name: string;
   company: string | null;
   role: string | null;
+  email: string | null;
+  phone: string | null;
   personalDetails: string | null;
   notes: string | null;
   source: string | null;
-  birthday: string | null;
+  birthdayMonth: number | null;
+  birthdayDay: number | null;
   children: string | null;
 };
 
@@ -39,13 +42,16 @@ The JSON must have these fields:
 - name (string, required): The person's full name
 - company (string or null): Where they work
 - role (string or null): Their job title or role
+- email (string or null): Their email address if mentioned
+- phone (string or null): Their phone number if mentioned
 - personalDetails (string or null): Personal information like family, pets, hobbies, interests, preferences
 - notes (string or null): Any other relevant information that doesn't fit above
 - source (string or null): Where/how the speaker met this person (event, introduction, context)
-- birthday (string or null): The person's birthday in YYYY-MM-DD format if mentioned
+- birthdayMonth (number or null): The month of their birthday (1-12) if mentioned
+- birthdayDay (number or null): The day of their birthday (1-31) if mentioned
 - children (string or null): Information about their children (names, ages, etc.)
 
-If a field isn't mentioned in the transcript, set it to null. Write in clear, concise language.`;
+If a field isn't mentioned in the transcript, set it to null. Write in clear, concise language. For birthdays, only extract the month and day -- do NOT include the year.`;
 
 async function tidyTranscript(transcript: string): Promise<string> {
   const anthropic = getClient();
@@ -99,10 +105,13 @@ export async function extractPersonFromTranscript(
     name: parsed.name || "Unknown",
     company: parsed.company || null,
     role: parsed.role || null,
+    email: parsed.email || null,
+    phone: parsed.phone || null,
     personalDetails: parsed.personalDetails || parsed.personal_details || null,
     notes: parsed.notes || null,
     source: parsed.source || null,
-    birthday: parsed.birthday || null,
+    birthdayMonth: parsed.birthdayMonth ?? parsed.birthday_month ?? null,
+    birthdayDay: parsed.birthdayDay ?? parsed.birthday_day ?? null,
     children: parsed.children || null,
     tidiedTranscript,
   };

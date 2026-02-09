@@ -14,6 +14,15 @@ export default function SettingsPage() {
   const [copied, setCopied] = useState(false);
   const [exporting, setExporting] = useState(false);
 
+  // Telegram state
+  const [telegramLinked, setTelegramLinked] = useState(false);
+  const [telegramLoading, setTelegramLoading] = useState(true);
+  const [telegramLinking, setTelegramLinking] = useState(false);
+  const [telegramDeepLink, setTelegramDeepLink] = useState<string | null>(null);
+  const [telegramUnlinking, setTelegramUnlinking] = useState(false);
+  const [telegramError, setTelegramError] = useState<string | null>(null);
+  const [telegramCopied, setTelegramCopied] = useState(false);
+
   const fetchApiKey = useCallback(async () => {
     try {
       const res = await fetch("/api/settings/api-key");
@@ -26,9 +35,22 @@ export default function SettingsPage() {
     }
   }, []);
 
+  const fetchTelegramStatus = useCallback(async () => {
+    try {
+      const res = await fetch("/api/settings/telegram/status");
+      if (res.ok) {
+        const data = await res.json();
+        setTelegramLinked(data.linked);
+      }
+    } finally {
+      setTelegramLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchApiKey();
-  }, [fetchApiKey]);
+    fetchTelegramStatus();
+  }, [fetchApiKey, fetchTelegramStatus]);
 
   async function handleRegenerate() {
     if (
@@ -60,6 +82,44 @@ export default function SettingsPage() {
     setTimeout(() => setCopied(false), 2000);
   }
 
+  async function handleLinkTelegram() {
+    setTelegramLinking(true);
+    setTelegramError(null);
+    try {
+      const res = await fetch("/api/settings/telegram/link", {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setTelegramDeepLink(data.deepLink);
+      } else {
+        setTelegramError(data.error || "Failed to generate link");
+      }
+    } catch (err) {
+      setTelegramError("Network error. Please try again.");
+    } finally {
+      setTelegramLinking(false);
+    }
+  }
+
+  async function handleUnlinkTelegram() {
+    if (!confirm("Unlink your Telegram account? You'll stop receiving weekly summaries."))
+      return;
+
+    setTelegramUnlinking(true);
+    try {
+      const res = await fetch("/api/settings/telegram/link", {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setTelegramLinked(false);
+        setTelegramDeepLink(null);
+      }
+    } finally {
+      setTelegramUnlinking(false);
+    }
+  }
+
   const maskedKey = apiKey
     ? `${apiKey.slice(0, 6)}${"*".repeat(20)}${apiKey.slice(-4)}`
     : "";
@@ -67,6 +127,97 @@ export default function SettingsPage() {
   return (
     <div className="space-y-8">
       <h1 className="text-lg font-semibold">Settings</h1>
+
+      {/* Telegram / Notifications Section */}
+      <section className="space-y-4">
+        <h2 className="text-sm font-medium">Notifications</h2>
+        <p className="text-sm text-muted-foreground">
+          Link your Telegram account to receive weekly contact summaries and ask
+          questions about your contacts via chat.
+        </p>
+
+        {telegramLoading ? (
+          <div className="h-10 rounded-lg bg-muted animate-pulse" />
+        ) : telegramLinked ? (
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 rounded-lg border border-border px-4 py-2.5">
+              <div className="h-2 w-2 rounded-full bg-green-500" />
+              <span className="text-sm">Telegram linked</span>
+            </div>
+            <button
+              onClick={handleUnlinkTelegram}
+              disabled={telegramUnlinking}
+              className="text-sm text-destructive hover:underline disabled:opacity-50"
+            >
+              {telegramUnlinking ? "Unlinking..." : "Unlink"}
+            </button>
+          </div>
+        ) : telegramDeepLink ? (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Click the link below to open Telegram and connect your account:
+            </p>
+            <div className="flex items-center gap-2">
+              <a
+                href={telegramDeepLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center rounded-lg bg-[#0088cc] px-4 py-2 text-sm font-medium text-white hover:opacity-90 transition-opacity"
+              >
+                Open in Telegram
+              </a>
+              <button
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(telegramDeepLink);
+                    setTelegramCopied(true);
+                    setTimeout(() => setTelegramCopied(false), 2000);
+                  } catch {
+                    // Fallback: select text in a temp input
+                    const input = document.createElement("input");
+                    input.value = telegramDeepLink;
+                    document.body.appendChild(input);
+                    input.select();
+                    document.execCommand("copy");
+                    document.body.removeChild(input);
+                    setTelegramCopied(true);
+                    setTimeout(() => setTelegramCopied(false), 2000);
+                  }
+                }}
+                className="rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted transition-colors"
+              >
+                {telegramCopied ? "Copied!" : "Copy link"}
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              After clicking, press &ldquo;Start&rdquo; in Telegram to complete the link.
+              Then come back here and refresh to see the status update.
+            </p>
+          </div>
+        ) : (
+          <button
+            onClick={handleLinkTelegram}
+            disabled={telegramLinking}
+            className="inline-flex items-center rounded-lg bg-[#0088cc] px-4 py-2 text-sm font-medium text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+          >
+            {telegramLinking ? "Generating link..." : "Link Telegram"}
+          </button>
+        )}
+
+        {telegramError && (
+          <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive">
+            {telegramError}
+          </div>
+        )}
+
+        <div className="text-xs text-muted-foreground space-y-1">
+          <p>Once linked you will:</p>
+          <ul className="list-disc list-inside space-y-0.5 ml-1">
+            <li>Receive a weekly summary of new contacts and upcoming birthdays</li>
+            <li>Be able to ask questions about your contacts via Telegram</li>
+          </ul>
+        </div>
+      </section>
 
       {/* iOS Shortcut Section */}
       <section className="space-y-4">

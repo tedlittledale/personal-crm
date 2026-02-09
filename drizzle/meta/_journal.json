@@ -15,6 +15,13 @@
       "when": 1770409306005,
       "tag": "0001_gigantic_the_fallen",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1770508800000,
+      "tag": "0002_add_telegram_and_birthday_split",
+      "breakpoints": true
     }
   ]
 }

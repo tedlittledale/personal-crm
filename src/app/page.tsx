@@ -5,6 +5,7 @@ import { eq, and, ilike, desc } from "drizzle-orm";
 import { ensureUser } from "@/lib/ensure-user";
 import { SearchInput } from "@/components/search-input";
 import { PeopleList } from "@/components/people-list";
+import { HomeContent } from "@/components/home-content";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -43,9 +44,8 @@ export default async function HomePage({
         </Link>
       </div>
       <Suspense>
-        <SearchInput />
+        <HomeContent serverPeople={results} />
       </Suspense>
-      <PeopleList people={results} />
     </div>
   );
 }

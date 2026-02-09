@@ -8,10 +8,13 @@ type PersonData = {
   name: string;
   company: string | null;
   role: string | null;
+  email: string | null;
+  phone: string | null;
   personalDetails: string | null;
   notes: string | null;
   source: string | null;
-  birthday: string | null;
+  birthdayMonth: number | null;
+  birthdayDay: number | null;
   children: string | null;
 };
 
@@ -33,14 +36,19 @@ export function PersonForm({
     setError(null);
 
     const formData = new FormData(e.currentTarget);
+    const birthdayMonthRaw = formData.get("birthdayMonth") as string;
+    const birthdayDayRaw = formData.get("birthdayDay") as string;
     const body = {
       name: formData.get("name") as string,
       company: formData.get("company") as string,
       role: formData.get("role") as string,
+      email: formData.get("email") as string,
+      phone: formData.get("phone") as string,
       personalDetails: formData.get("personalDetails") as string,
       notes: formData.get("notes") as string,
       source: formData.get("source") as string,
-      birthday: formData.get("birthday") as string,
+      birthdayMonth: birthdayMonthRaw ? parseInt(birthdayMonthRaw, 10) : null,
+      birthdayDay: birthdayDayRaw ? parseInt(birthdayDayRaw, 10) : null,
       children: formData.get("children") as string,
     };
 
@@ -154,16 +162,59 @@ export function PersonForm({
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label htmlFor="birthday" className="block text-sm font-medium mb-1">
-            Birthday
+          <label htmlFor="email" className="block text-sm font-medium mb-1">
+            Email
           </label>
           <input
-            id="birthday"
-            name="birthday"
-            type="date"
-            defaultValue={initialData?.birthday ?? ""}
+            id="email"
+            name="email"
+            type="email"
+            defaultValue={initialData?.email ?? ""}
             className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
           />
+        </div>
+        <div>
+          <label htmlFor="phone" className="block text-sm font-medium mb-1">
+            Phone
+          </label>
+          <input
+            id="phone"
+            name="phone"
+            type="tel"
+            defaultValue={initialData?.phone ?? ""}
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium mb-1">Birthday</label>
+          <div className="flex gap-2">
+            <select
+              name="birthdayMonth"
+              defaultValue={initialData?.birthdayMonth?.toString() ?? ""}
+              className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
+            >
+              <option value="">Month</option>
+              {[
+                "January", "February", "March", "April", "May", "June",
+                "July", "August", "September", "October", "November", "December",
+              ].map((m, i) => (
+                <option key={i + 1} value={i + 1}>{m}</option>
+              ))}
+            </select>
+            <select
+              name="birthdayDay"
+              defaultValue={initialData?.birthdayDay?.toString() ?? ""}
+              className="w-20 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
+            >
+              <option value="">Day</option>
+              {Array.from({ length: 31 }, (_, i) => (
+                <option key={i + 1} value={i + 1}>{i + 1}</option>
+              ))}
+            </select>
+          </div>
         </div>
         <div>
           <label htmlFor="children" className="block text-sm font-medium mb-1">
