@@ -52,6 +52,28 @@ export default function SettingsPage() {
     fetchTelegramStatus();
   }, [fetchApiKey, fetchTelegramStatus]);
 
+  // Poll for link status while the deep link is shown
+  useEffect(() => {
+    if (!telegramDeepLink || telegramLinked) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch("/api/settings/telegram/status");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.linked) {
+            setTelegramLinked(true);
+            setTelegramDeepLink(null);
+          }
+        }
+      } catch {
+        // Silently ignore polling errors
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [telegramDeepLink, telegramLinked]);
+
   async function handleRegenerate() {
     if (
       !confirm(
@@ -160,8 +182,6 @@ export default function SettingsPage() {
             <div className="flex items-center gap-2">
               <a
                 href={telegramDeepLink}
-                target="_blank"
-                rel="noopener noreferrer"
                 className="inline-flex items-center rounded-lg bg-[#0088cc] px-4 py-2 text-sm font-medium text-white hover:opacity-90 transition-opacity"
               >
                 Open in Telegram
