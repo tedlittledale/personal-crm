@@ -3,10 +3,12 @@ import { db } from "@/db";
 import { users, people } from "@/db/schema";
 import { eq, and, gte, isNotNull } from "drizzle-orm";
 import { getMessagingProvider } from "@/lib/messaging";
+import { getUpcomingBirthdays, buildWeeklySummary } from "@/lib/weekly-summary";
 
 /**
  * GET /api/cron/weekly-summary
- * Sends a weekly summary to all users with linked Telegram accounts.
+ * Runs every hour via Vercel cron. For each user with a linked Telegram,
+ * checks if it's Sunday at their preferred hour in their timezone.
  * Protected by CRON_SECRET via Authorization: Bearer header.
  */
 export async function GET(req: NextRequest) {
@@ -37,12 +39,34 @@ export async function GET(req: NextRequest) {
     .where(isNotNull(users.telegramChatId));
 
   let sent = 0;
+  let skipped = 0;
   let errors = 0;
 
   for (const user of linkedUsers) {
     if (!user.telegramChatId) continue;
 
     try {
+      // Check if it's the right day/hour in the user's timezone
+      const userNow = new Date(
+        now.toLocaleString("en-US", { timeZone: user.weeklySummaryTimezone })
+      );
+      const userDay = userNow.getDay(); // 0 = Sunday
+      const userHour = userNow.getHours();
+
+      if (userDay !== 0 || userHour !== user.weeklySummaryHour) {
+        skipped++;
+        continue;
+      }
+
+      // Prevent duplicate sends within the same hour window
+      if (user.lastWeeklySummaryAt) {
+        const hourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+        if (user.lastWeeklySummaryAt > hourAgo) {
+          skipped++;
+          continue;
+        }
+      }
+
       // Get contacts added in the last 7 days
       const newContacts = await db
         .select()
@@ -56,13 +80,20 @@ export async function GET(req: NextRequest) {
 
       // Skip if nothing to report
       if (newContacts.length === 0 && upcomingBirthdays.length === 0) {
+        skipped++;
         continue;
       }
 
-      // Build the message
+      // Build and send the message
       const message = buildWeeklySummary(newContacts, upcomingBirthdays);
-
       await messaging.sendMessage(user.telegramChatId, message);
+
+      // Update lastWeeklySummaryAt
+      await db
+        .update(users)
+        .set({ lastWeeklySummaryAt: now })
+        .where(eq(users.id, user.id));
+
       sent++;
     } catch (err) {
       console.error(`Failed to send summary to user ${user.id}:`, err);
@@ -74,100 +105,7 @@ export async function GET(req: NextRequest) {
     ok: true,
     usersChecked: linkedUsers.length,
     sent,
+    skipped,
     errors,
   });
-}
-
-const MONTH_NAMES = [
-  "",
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
-
-/**
- * Find contacts whose birthday falls within the next N days.
- * Handles month boundaries (e.g. Dec 28 → Jan 3).
- */
-async function getUpcomingBirthdays(
-  userId: string,
-  from: Date,
-  days: number
-): Promise<(typeof people.$inferSelect)[]> {
-  // Get all contacts with birthdays set
-  const allWithBirthdays = await db
-    .select()
-    .from(people)
-    .where(
-      and(
-        eq(people.userId, userId),
-        isNotNull(people.birthdayMonth),
-        isNotNull(people.birthdayDay)
-      )
-    );
-
-  // Filter in application code for date range (handles year wrap)
-  const upcoming: (typeof people.$inferSelect)[] = [];
-
-  for (let d = 0; d < days; d++) {
-    const checkDate = new Date(from.getTime() + d * 24 * 60 * 60 * 1000);
-    const checkMonth = checkDate.getMonth() + 1; // 1-indexed
-    const checkDay = checkDate.getDate();
-
-    for (const person of allWithBirthdays) {
-      if (
-        person.birthdayMonth === checkMonth &&
-        person.birthdayDay === checkDay
-      ) {
-        upcoming.push(person);
-      }
-    }
-  }
-
-  return upcoming;
-}
-
-function buildWeeklySummary(
-  newContacts: (typeof people.$inferSelect)[],
-  upcomingBirthdays: (typeof people.$inferSelect)[]
-): string {
-  const sections: string[] = [];
-
-  sections.push("📋 Weekly People Notes Summary\n");
-
-  if (newContacts.length > 0) {
-    sections.push(`🆕 New Contacts This Week (${newContacts.length}):`);
-    for (const p of newContacts) {
-      const details = [p.role, p.company].filter(Boolean).join(" at ");
-      const source = p.source ? ` — ${p.source}` : "";
-      sections.push(`  • ${p.name}${details ? ` (${details})` : ""}${source}`);
-    }
-    sections.push("");
-  }
-
-  if (upcomingBirthdays.length > 0) {
-    sections.push(`🎂 Upcoming Birthdays (${upcomingBirthdays.length}):`);
-    for (const p of upcomingBirthdays) {
-      const monthName = p.birthdayMonth
-        ? MONTH_NAMES[p.birthdayMonth]
-        : "?";
-      sections.push(`  • ${p.name} — ${monthName} ${p.birthdayDay}`);
-    }
-    sections.push("");
-  }
-
-  sections.push(
-    "💬 Reply to this message to ask questions about your contacts."
-  );
-
-  return sections.join("\n");
 }

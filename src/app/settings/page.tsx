@@ -14,6 +14,15 @@ export default function SettingsPage() {
   const [copied, setCopied] = useState(false);
   const [exporting, setExporting] = useState(false);
 
+  // Weekly summary state
+  const [summaryHour, setSummaryHour] = useState(20);
+  const [summaryTimezone, setSummaryTimezone] = useState("America/New_York");
+  const [summaryLastSent, setSummaryLastSent] = useState<string | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(true);
+  const [summarySaving, setSummarySaving] = useState(false);
+  const [summaryTesting, setSummaryTesting] = useState(false);
+  const [summaryTestResult, setSummaryTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+
   // Telegram state
   const [telegramLinked, setTelegramLinked] = useState(false);
   const [telegramLoading, setTelegramLoading] = useState(true);
@@ -35,6 +44,20 @@ export default function SettingsPage() {
     }
   }, []);
 
+  const fetchSummarySettings = useCallback(async () => {
+    try {
+      const res = await fetch("/api/settings/weekly-summary");
+      if (res.ok) {
+        const data = await res.json();
+        setSummaryHour(data.hour);
+        setSummaryTimezone(data.timezone);
+        setSummaryLastSent(data.lastSentAt);
+      }
+    } finally {
+      setSummaryLoading(false);
+    }
+  }, []);
+
   const fetchTelegramStatus = useCallback(async () => {
     try {
       const res = await fetch("/api/settings/telegram/status");
@@ -50,7 +73,8 @@ export default function SettingsPage() {
   useEffect(() => {
     fetchApiKey();
     fetchTelegramStatus();
-  }, [fetchApiKey, fetchTelegramStatus]);
+    fetchSummarySettings();
+  }, [fetchApiKey, fetchTelegramStatus, fetchSummarySettings]);
 
   // Poll for link status while the deep link is shown
   useEffect(() => {
@@ -121,6 +145,43 @@ export default function SettingsPage() {
       setTelegramError("Network error. Please try again.");
     } finally {
       setTelegramLinking(false);
+    }
+  }
+
+  async function handleSaveSummarySettings(hour: number, timezone: string) {
+    setSummarySaving(true);
+    try {
+      const res = await fetch("/api/settings/weekly-summary", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hour, timezone }),
+      });
+      if (res.ok) {
+        setSummaryHour(hour);
+        setSummaryTimezone(timezone);
+      }
+    } finally {
+      setSummarySaving(false);
+    }
+  }
+
+  async function handleTestSummary() {
+    setSummaryTesting(true);
+    setSummaryTestResult(null);
+    try {
+      const res = await fetch("/api/settings/weekly-summary/test", {
+        method: "POST",
+      });
+      if (res.ok) {
+        setSummaryTestResult({ ok: true, message: "Test summary sent to Telegram!" });
+      } else {
+        const data = await res.json();
+        setSummaryTestResult({ ok: false, message: data.error || "Failed to send test summary" });
+      }
+    } catch {
+      setSummaryTestResult({ ok: false, message: "Network error. Please try again." });
+    } finally {
+      setSummaryTesting(false);
     }
   }
 
@@ -237,6 +298,110 @@ export default function SettingsPage() {
             <li>Be able to ask questions about your contacts via Telegram</li>
           </ul>
         </div>
+
+        {/* Weekly Summary Settings - shown when Telegram is linked */}
+        {telegramLinked && (
+          <div className="space-y-4 rounded-lg border border-border p-4">
+            <h3 className="text-sm font-medium">Weekly Summary</h3>
+            <p className="text-xs text-muted-foreground">
+              Choose when to receive your weekly summary every Sunday.
+            </p>
+
+            {summaryLoading ? (
+              <div className="h-10 rounded-lg bg-muted animate-pulse" />
+            ) : (
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div>
+                    <label className="block text-xs text-muted-foreground mb-1">Time</label>
+                    <select
+                      value={summaryHour}
+                      onChange={(e) => {
+                        const newHour = parseInt(e.target.value, 10);
+                        handleSaveSummarySettings(newHour, summaryTimezone);
+                      }}
+                      disabled={summarySaving}
+                      className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                    >
+                      {Array.from({ length: 24 }, (_, i) => {
+                        const period = i >= 12 ? "PM" : "AM";
+                        const display = i === 0 ? 12 : i > 12 ? i - 12 : i;
+                        return (
+                          <option key={i} value={i}>
+                            {display}:00 {period}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-muted-foreground mb-1">Timezone</label>
+                    <select
+                      value={summaryTimezone}
+                      onChange={(e) => {
+                        handleSaveSummarySettings(summaryHour, e.target.value);
+                      }}
+                      disabled={summarySaving}
+                      className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                    >
+                      <option value="America/New_York">Eastern (New York)</option>
+                      <option value="America/Chicago">Central (Chicago)</option>
+                      <option value="America/Denver">Mountain (Denver)</option>
+                      <option value="America/Los_Angeles">Pacific (Los Angeles)</option>
+                      <option value="America/Anchorage">Alaska</option>
+                      <option value="Pacific/Honolulu">Hawaii</option>
+                      <option value="Europe/London">London</option>
+                      <option value="Europe/Paris">Paris</option>
+                      <option value="Europe/Berlin">Berlin</option>
+                      <option value="Asia/Tokyo">Tokyo</option>
+                      <option value="Asia/Shanghai">Shanghai</option>
+                      <option value="Asia/Kolkata">India (Kolkata)</option>
+                      <option value="Australia/Sydney">Sydney</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleTestSummary}
+                    disabled={summaryTesting}
+                    className="inline-flex items-center rounded-lg border border-border px-4 py-2 text-sm hover:bg-muted transition-colors disabled:opacity-50"
+                  >
+                    {summaryTesting ? "Sending..." : "Send test summary now"}
+                  </button>
+                  {summarySaving && (
+                    <span className="text-xs text-muted-foreground">Saving...</span>
+                  )}
+                </div>
+
+                {summaryTestResult && (
+                  <div
+                    className={`rounded-lg px-4 py-3 text-sm ${
+                      summaryTestResult.ok
+                        ? "bg-green-500/10 border border-green-500/20 text-green-700 dark:text-green-400"
+                        : "bg-destructive/10 border border-destructive/20 text-destructive"
+                    }`}
+                  >
+                    {summaryTestResult.message}
+                  </div>
+                )}
+
+                {summaryLastSent && (
+                  <p className="text-xs text-muted-foreground">
+                    Last sent: {new Date(summaryLastSent).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </section>
 
       {/* iOS Shortcut Section */}

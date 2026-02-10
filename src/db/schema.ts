@@ -15,6 +15,11 @@ export const users = pgTable("users", {
   phone: text("phone"), // for future WhatsApp/Twilio
   telegramChatId: text("telegram_chat_id").unique(),
   telegramLinkToken: text("telegram_link_token"),
+  weeklySummaryHour: integer("weekly_summary_hour").default(20).notNull(),
+  weeklySummaryTimezone: text("weekly_summary_timezone")
+    .default("America/New_York")
+    .notNull(),
+  lastWeeklySummaryAt: timestamp("last_weekly_summary_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
