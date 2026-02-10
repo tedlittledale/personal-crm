@@ -7,6 +7,28 @@ import { ensureUser } from "@/lib/ensure-user";
 import crypto from "crypto";
 
 /**
+ * Resolve the stable public origin for the app.
+ * Priority: APP_URL env > Vercel production URL > request headers.
+ */
+function getPublicOrigin(req: NextRequest): string | null {
+  // Explicit env var takes priority (e.g. "https://personalcrm.tedspace.dev")
+  if (process.env.APP_URL) {
+    return process.env.APP_URL.replace(/\/+$/, "");
+  }
+
+  // Vercel sets this to the stable production domain (without protocol)
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+  }
+
+  // Fallback: derive from request headers
+  const proto = req.headers.get("x-forwarded-proto") || "https";
+  const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
+  if (!host) return null;
+  return `${proto}://${host}`;
+}
+
+/**
  * Ensure the Telegram webhook is pointed at our API route.
  * Returns an error string if registration fails, or null on success.
  */
@@ -14,12 +36,10 @@ async function ensureWebhookRegistered(req: NextRequest): Promise<string | null>
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
   if (!botToken) return "TELEGRAM_BOT_TOKEN is not set";
 
-  // Derive the public origin from forwarded headers (works behind proxies/Vercel)
-  const proto = req.headers.get("x-forwarded-proto") || "https";
-  const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
-  if (!host) return "Could not determine app host from request headers";
+  const origin = getPublicOrigin(req);
+  if (!origin) return "Could not determine app URL. Set APP_URL env var.";
 
-  const webhookUrl = `${proto}://${host}/api/telegram/webhook`;
+  const webhookUrl = `${origin}/api/telegram/webhook`;
 
   const res = await fetch(
     `https://api.telegram.org/bot${botToken}/setWebhook`,
