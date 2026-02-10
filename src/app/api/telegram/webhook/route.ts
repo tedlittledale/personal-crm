@@ -6,6 +6,31 @@ import { getMessagingProvider } from "@/lib/messaging";
 import { answerContactQuestion } from "@/lib/nl-query";
 
 /**
+ * GET /api/telegram/webhook
+ * Diagnostic endpoint — returns Telegram's view of the current webhook config.
+ * Visit this in a browser to debug webhook issues.
+ */
+export async function GET() {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  if (!botToken) {
+    return NextResponse.json({ error: "TELEGRAM_BOT_TOKEN not set" }, { status: 500 });
+  }
+
+  try {
+    const res = await fetch(
+      `https://api.telegram.org/bot${botToken}/getWebhookInfo`
+    );
+    const data = await res.json();
+    return NextResponse.json(data);
+  } catch (err) {
+    return NextResponse.json(
+      { error: "Failed to reach Telegram API", details: String(err) },
+      { status: 502 }
+    );
+  }
+}
+
+/**
  * POST /api/telegram/webhook
  * Receives Telegram updates via webhook.
  * Handles /start for account linking and general messages for Q&A.
@@ -13,6 +38,7 @@ import { answerContactQuestion } from "@/lib/nl-query";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+    console.log("Telegram webhook received:", JSON.stringify(body));
     const message = body?.message;
 
     if (!message?.text || !message?.chat?.id) {

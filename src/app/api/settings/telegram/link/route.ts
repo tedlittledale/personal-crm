@@ -8,15 +8,18 @@ import crypto from "crypto";
 
 /**
  * Ensure the Telegram webhook is pointed at our API route.
- * This is idempotent — Telegram ignores the call if the URL is already set.
+ * Returns an error string if registration fails, or null on success.
  */
-async function ensureWebhookRegistered(requestUrl: string) {
+async function ensureWebhookRegistered(req: NextRequest): Promise<string | null> {
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
-  if (!botToken) return;
+  if (!botToken) return "TELEGRAM_BOT_TOKEN is not set";
 
-  // Derive the app's origin from the incoming request
-  const url = new URL(requestUrl);
-  const webhookUrl = `${url.origin}/api/telegram/webhook`;
+  // Derive the public origin from forwarded headers (works behind proxies/Vercel)
+  const proto = req.headers.get("x-forwarded-proto") || "https";
+  const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
+  if (!host) return "Could not determine app host from request headers";
+
+  const webhookUrl = `${proto}://${host}/api/telegram/webhook`;
 
   const res = await fetch(
     `https://api.telegram.org/bot${botToken}/setWebhook`,
@@ -27,10 +30,15 @@ async function ensureWebhookRegistered(requestUrl: string) {
     }
   );
 
-  if (!res.ok) {
-    const body = await res.text();
-    console.error("Failed to register Telegram webhook:", body);
+  const body = await res.json();
+  if (!res.ok || !body.ok) {
+    const errMsg = `Webhook registration failed: ${JSON.stringify(body)}`;
+    console.error(errMsg);
+    return errMsg;
   }
+
+  console.log(`Telegram webhook registered: ${webhookUrl}`);
+  return null;
 }
 
 /**
@@ -63,10 +71,11 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Ensure webhook is registered (fire-and-forget, don't block the response)
-  ensureWebhookRegistered(req.url).catch((err) =>
-    console.error("Webhook registration error:", err)
-  );
+  // Register webhook (blocking — we need this to work for linking to succeed)
+  const webhookError = await ensureWebhookRegistered(req);
+  if (webhookError) {
+    console.error("Webhook registration issue:", webhookError);
+  }
 
   const deepLink = `https://t.me/${botUsername}?start=${linkToken}`;
 
