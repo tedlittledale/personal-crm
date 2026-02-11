@@ -22,6 +22,27 @@
       "when": 1770508800000,
       "tag": "0002_add_telegram_and_birthday_split",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1770595200000,
+      "tag": "0003_add_weekly_summary_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1770681600000,
+      "tag": "0004_change_default_timezone_to_london",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1770768000000,
+      "tag": "0005_add_ai_summary",
+      "breakpoints": true
     }
   ]
 }
