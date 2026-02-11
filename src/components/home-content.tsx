@@ -10,6 +10,7 @@ type Person = {
   company: string | null;
   role: string | null;
   source: string | null;
+  aiSummary?: string | null;
   updatedAt: Date | string;
 };
 

@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { people } from "@/db/schema";
 import { eq, and, ilike, desc } from "drizzle-orm";
 import { ensureUser } from "@/lib/ensure-user";
+import { generateContactSummary } from "@/lib/generate-summary";
 
 // GET /api/people - List all people for the logged-in user, with optional search
 export async function GET(req: NextRequest) {
@@ -47,23 +48,35 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const contactData = {
+      userId,
+      name: name.trim(),
+      company: company?.trim() || null,
+      role: role?.trim() || null,
+      email: email?.trim() || null,
+      phone: phone?.trim() || null,
+      personalDetails: personalDetails?.trim() || null,
+      notes: notes?.trim() || null,
+      source: source?.trim() || null,
+      birthdayMonth: birthdayMonth ?? null,
+      birthdayDay: birthdayDay ?? null,
+      children: children?.trim() || null,
+    };
+
     const [person] = await db
       .insert(people)
-      .values({
-        userId,
-        name: name.trim(),
-        company: company?.trim() || null,
-        role: role?.trim() || null,
-        email: email?.trim() || null,
-        phone: phone?.trim() || null,
-        personalDetails: personalDetails?.trim() || null,
-        notes: notes?.trim() || null,
-        source: source?.trim() || null,
-        birthdayMonth: birthdayMonth ?? null,
-        birthdayDay: birthdayDay ?? null,
-        children: children?.trim() || null,
-      })
+      .values(contactData)
       .returning();
+
+    // Generate AI summary in the background — don't block the response
+    generateContactSummary(contactData)
+      .then((aiSummary) =>
+        db
+          .update(people)
+          .set({ aiSummary })
+          .where(eq(people.id, person.id))
+      )
+      .catch((err) => console.error("Failed to generate summary:", err));
 
     return NextResponse.json(person, { status: 201 });
   } catch (err) {

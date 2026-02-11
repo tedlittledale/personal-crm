@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
+import { generateContactSummary } from "@/lib/generate-summary";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -70,6 +71,16 @@ export async function PUT(req: NextRequest, { params }: Params) {
     })
     .where(eq(people.id, id))
     .returning();
+
+  // Regenerate AI summary in the background with the updated data
+  generateContactSummary(updated)
+    .then((aiSummary) =>
+      db
+        .update(people)
+        .set({ aiSummary })
+        .where(eq(people.id, id))
+    )
+    .catch((err) => console.error("Failed to generate summary:", err));
 
   return NextResponse.json(updated);
 }

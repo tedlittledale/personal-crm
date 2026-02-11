@@ -2,7 +2,9 @@ import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { people } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { ensureUser } from "@/lib/ensure-user";
+import { generateContactSummary } from "@/lib/generate-summary";
 
 /**
  * POST /api/people/bulk - Create multiple people in a single transaction
@@ -68,6 +70,22 @@ export async function POST(req: NextRequest) {
     );
 
     const created = await db.insert(people).values(values).returning();
+
+    // Generate AI summaries in the background for all created contacts
+    Promise.all(
+      created.map((person) =>
+        generateContactSummary(person)
+          .then((aiSummary) =>
+            db
+              .update(people)
+              .set({ aiSummary })
+              .where(eq(people.id, person.id))
+          )
+          .catch((err) =>
+            console.error(`Failed to generate summary for ${person.name}:`, err)
+          )
+      )
+    ).catch((err) => console.error("Failed to generate bulk summaries:", err));
 
     return NextResponse.json(
       { created: created.length, people: created },

@@ -6,6 +6,7 @@ type Person = {
   company: string | null;
   role: string | null;
   source: string | null;
+  aiSummary?: string | null;
   updatedAt: Date | string;
 };
 
@@ -32,7 +33,8 @@ export function PeopleList({ people }: { people: Person[] }) {
             <div className="min-w-0 flex-1 px-2">
               <p className="font-medium text-sm truncate">{person.name}</p>
               <p className="text-xs text-muted-foreground truncate mt-0.5">
-                {[person.role, person.company].filter(Boolean).join(" at ") ||
+                {person.aiSummary ||
+                  [person.role, person.company].filter(Boolean).join(" at ") ||
                   person.source ||
                   "No details"}
               </p>
