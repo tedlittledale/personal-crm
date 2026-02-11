@@ -36,8 +36,15 @@ export default async function ReviewPage({
     );
   }
 
-  const extracted = (review.extractedData as Record<string, string | null>) || {};
-  const tidiedTranscript = extracted.tidiedTranscript;
+  const extracted = (review.extractedData as Record<string, unknown>) || {};
+  const tidiedTranscript = extracted.tidiedTranscript as string | undefined;
+  const fuzzyMatches = (extracted.fuzzyMatches as Array<{
+    id: string;
+    name: string;
+    company: string | null;
+    role: string | null;
+    similarity: number;
+  }>) || [];
 
   return (
     <div className="space-y-4">
@@ -73,18 +80,19 @@ export default async function ReviewPage({
       <ReviewForm
         reviewId={review.id}
         initialData={{
-          name: extracted.name || "",
-          company: extracted.company || null,
-          role: extracted.role || null,
-          email: extracted.email || null,
-          phone: extracted.phone || null,
-          personalDetails: extracted.personalDetails || extracted.personal_details || null,
-          notes: extracted.notes || null,
-          source: extracted.source || null,
+          name: (extracted.name as string) || "",
+          company: (extracted.company as string) || null,
+          role: (extracted.role as string) || null,
+          email: (extracted.email as string) || null,
+          phone: (extracted.phone as string) || null,
+          personalDetails: (extracted.personalDetails as string) || (extracted.personal_details as string) || null,
+          notes: (extracted.notes as string) || null,
+          source: (extracted.source as string) || null,
           birthdayMonth: Number(extracted.birthdayMonth ?? extracted.birthday_month) || null,
           birthdayDay: Number(extracted.birthdayDay ?? extracted.birthday_day) || null,
-          children: extracted.children || null,
+          children: (extracted.children as string) || null,
         }}
+        fuzzyMatches={fuzzyMatches}
       />
     </div>
   );
