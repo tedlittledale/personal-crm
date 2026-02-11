@@ -16,7 +16,7 @@ export default function SettingsPage() {
 
   // Weekly summary state
   const [summaryHour, setSummaryHour] = useState(20);
-  const [summaryTimezone, setSummaryTimezone] = useState("America/New_York");
+  const [summaryTimezone, setSummaryTimezone] = useState("Europe/London");
   const [summaryLastSent, setSummaryLastSent] = useState<string | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [summarySaving, setSummarySaving] = useState(false);
@@ -149,6 +149,11 @@ export default function SettingsPage() {
   }
 
   async function handleSaveSummarySettings(hour: number, timezone: string) {
+    const prevHour = summaryHour;
+    const prevTimezone = summaryTimezone;
+    // Update state optimistically so the controlled selects reflect the choice immediately
+    setSummaryHour(hour);
+    setSummaryTimezone(timezone);
     setSummarySaving(true);
     try {
       const res = await fetch("/api/settings/weekly-summary", {
@@ -156,10 +161,15 @@ export default function SettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ hour, timezone }),
       });
-      if (res.ok) {
-        setSummaryHour(hour);
-        setSummaryTimezone(timezone);
+      if (!res.ok) {
+        // Revert on failure
+        setSummaryHour(prevHour);
+        setSummaryTimezone(prevTimezone);
       }
+    } catch {
+      // Revert on network error
+      setSummaryHour(prevHour);
+      setSummaryTimezone(prevTimezone);
     } finally {
       setSummarySaving(false);
     }
@@ -345,15 +355,15 @@ export default function SettingsPage() {
                       disabled={summarySaving}
                       className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                     >
+                      <option value="Europe/London">London</option>
+                      <option value="Europe/Paris">Paris</option>
+                      <option value="Europe/Berlin">Berlin</option>
                       <option value="America/New_York">Eastern (New York)</option>
                       <option value="America/Chicago">Central (Chicago)</option>
                       <option value="America/Denver">Mountain (Denver)</option>
                       <option value="America/Los_Angeles">Pacific (Los Angeles)</option>
                       <option value="America/Anchorage">Alaska</option>
                       <option value="Pacific/Honolulu">Hawaii</option>
-                      <option value="Europe/London">London</option>
-                      <option value="Europe/Paris">Paris</option>
-                      <option value="Europe/Berlin">Berlin</option>
                       <option value="Asia/Tokyo">Tokyo</option>
                       <option value="Asia/Shanghai">Shanghai</option>
                       <option value="Asia/Kolkata">India (Kolkata)</option>
