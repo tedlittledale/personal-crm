@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { users, pendingReviews } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { extractPersonFromTranscript } from "@/lib/extract";
+import { fuzzySearchPeople } from "@/lib/fuzzy-search";
 
 // POST /api/ingest - Receive transcript via API key, extract data, create pending review
 export async function POST(req: NextRequest) {
@@ -48,8 +49,11 @@ export async function POST(req: NextRequest) {
     const { tidiedTranscript, ...extractedFields } =
       await extractPersonFromTranscript(transcript);
 
-    // Store tidied transcript alongside the extracted fields in the JSONB column
-    const extractedData = { ...extractedFields, tidiedTranscript };
+    // Check for existing people with similar names (fuzzy match)
+    const fuzzyMatches = await fuzzySearchPeople(user.id, extractedFields.name);
+
+    // Store tidied transcript and any fuzzy matches alongside the extracted fields
+    const extractedData = { ...extractedFields, tidiedTranscript, fuzzyMatches };
 
     // Create pending review with 7-day expiry
     const expiresAt = new Date();
