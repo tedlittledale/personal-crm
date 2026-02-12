@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "dev:staging": "env $(grep -v '^#' .env.staging | xargs) next dev",
+    "db:push:staging": "DB_ENV=staging npx drizzle-kit push",
+    "db:migrate:staging": "DB_ENV=staging npx drizzle-kit migrate",
+    "db:sync-staging": "bash scripts/sync-staging-db.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.73.0",

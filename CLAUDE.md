@@ -13,6 +13,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Environment variables are stored in `.env.local` (used by both Next.js and drizzle.config.ts).
 
+### Staging Environment
+
+A separate Supabase project is used for staging/preview deployments. Vercel preview branches automatically use the staging database.
+
+**Env files:**
+- `.env.local` — Production database + `PROD_DATABASE_URL_DIRECT` (direct connection for pg_dump)
+- `.env.staging` — Staging database (copy `.env.staging.template` and fill in values)
+
+**Staging commands:**
+- `npm run dev:staging` — Start dev server against staging DB
+- `npm run db:push:staging` — Push schema changes to staging
+- `npm run db:migrate:staging` — Run pending migrations on staging
+- `npm run db:sync-staging` — Sync production data to staging (pg_dump/psql)
+
 ## Architecture
 
 **Personal CRM ("People Notes")** — A Next.js 16 app for managing contacts with AI-powered voice note ingestion, natural language search, and Telegram bot integration. Deployed on Vercel.
