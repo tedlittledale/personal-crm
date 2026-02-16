@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type PersonData = {
   id?: string;
@@ -27,11 +27,21 @@ export function PersonForm({
 }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
+  const [saveComplete, setSaveComplete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const saveCompleteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (saveCompleteTimer.current) clearTimeout(saveCompleteTimer.current);
+    };
+  }, []);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (saveCompleteTimer.current) clearTimeout(saveCompleteTimer.current);
+    setSaveComplete(false);
     setSaving(true);
     setError(null);
 
@@ -69,11 +79,20 @@ export function PersonForm({
       }
 
       const person = await res.json();
-      router.push(`/person/${person.id}`);
-      router.refresh();
+
+      if (mode === "edit") {
+        setSaving(false);
+        setSaveComplete(true);
+        router.refresh();
+        saveCompleteTimer.current = setTimeout(() => {
+          setSaveComplete(false);
+        }, 2000);
+      } else {
+        router.push(`/person/${person.id}`);
+        router.refresh();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
       setSaving(false);
     }
   }
@@ -286,9 +305,20 @@ export function PersonForm({
           <button
             type="submit"
             disabled={saving}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
+            className={[
+              "rounded-lg px-4 py-2 text-sm font-medium transition-all duration-500",
+              saveComplete
+                ? "bg-green-600 text-white"
+                : "bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50",
+            ].join(" ")}
           >
-            {saving ? "Saving..." : mode === "edit" ? "Save changes" : "Add person"}
+            {saving
+              ? "Saving..."
+              : saveComplete
+                ? "Save complete"
+                : mode === "edit"
+                  ? "Save changes"
+                  : "Add person"}
           </button>
         </div>
       </div>
