@@ -15,6 +15,7 @@ export default function SettingsPage() {
   const [exporting, setExporting] = useState(false);
 
   // Weekly summary state
+  const [summaryDay, setSummaryDay] = useState(0);
   const [summaryHour, setSummaryHour] = useState(20);
   const [summaryTimezone, setSummaryTimezone] = useState("Europe/London");
   const [summaryLastSent, setSummaryLastSent] = useState<string | null>(null);
@@ -49,6 +50,7 @@ export default function SettingsPage() {
       const res = await fetch("/api/settings/weekly-summary");
       if (res.ok) {
         const data = await res.json();
+        setSummaryDay(data.day);
         setSummaryHour(data.hour);
         setSummaryTimezone(data.timezone);
         setSummaryLastSent(data.lastSentAt);
@@ -148,10 +150,12 @@ export default function SettingsPage() {
     }
   }
 
-  async function handleSaveSummarySettings(hour: number, timezone: string) {
+  async function handleSaveSummarySettings(day: number, hour: number, timezone: string) {
+    const prevDay = summaryDay;
     const prevHour = summaryHour;
     const prevTimezone = summaryTimezone;
     // Update state optimistically so the controlled selects reflect the choice immediately
+    setSummaryDay(day);
     setSummaryHour(hour);
     setSummaryTimezone(timezone);
     setSummarySaving(true);
@@ -159,15 +163,17 @@ export default function SettingsPage() {
       const res = await fetch("/api/settings/weekly-summary", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hour, timezone }),
+        body: JSON.stringify({ day, hour, timezone }),
       });
       if (!res.ok) {
         // Revert on failure
+        setSummaryDay(prevDay);
         setSummaryHour(prevHour);
         setSummaryTimezone(prevTimezone);
       }
     } catch {
       // Revert on network error
+      setSummaryDay(prevDay);
       setSummaryHour(prevHour);
       setSummaryTimezone(prevTimezone);
     } finally {
@@ -314,7 +320,7 @@ export default function SettingsPage() {
           <div className="space-y-4 rounded-lg border border-border p-4">
             <h3 className="text-sm font-medium">Weekly Summary</h3>
             <p className="text-xs text-muted-foreground">
-              Choose when to receive your weekly summary every Sunday.
+              Choose which day and time to receive your weekly summary.
             </p>
 
             {summaryLoading ? (
@@ -323,12 +329,33 @@ export default function SettingsPage() {
               <div className="space-y-4">
                 <div className="flex flex-wrap items-center gap-3">
                   <div>
+                    <label className="block text-xs text-muted-foreground mb-1">Day</label>
+                    <select
+                      value={summaryDay}
+                      onChange={(e) => {
+                        const newDay = parseInt(e.target.value, 10);
+                        handleSaveSummarySettings(newDay, summaryHour, summaryTimezone);
+                      }}
+                      disabled={summarySaving}
+                      className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                    >
+                      <option value={0}>Sunday</option>
+                      <option value={1}>Monday</option>
+                      <option value={2}>Tuesday</option>
+                      <option value={3}>Wednesday</option>
+                      <option value={4}>Thursday</option>
+                      <option value={5}>Friday</option>
+                      <option value={6}>Saturday</option>
+                    </select>
+                  </div>
+
+                  <div>
                     <label className="block text-xs text-muted-foreground mb-1">Time</label>
                     <select
                       value={summaryHour}
                       onChange={(e) => {
                         const newHour = parseInt(e.target.value, 10);
-                        handleSaveSummarySettings(newHour, summaryTimezone);
+                        handleSaveSummarySettings(summaryDay, newHour, summaryTimezone);
                       }}
                       disabled={summarySaving}
                       className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
@@ -350,7 +377,7 @@ export default function SettingsPage() {
                     <select
                       value={summaryTimezone}
                       onChange={(e) => {
-                        handleSaveSummarySettings(summaryHour, e.target.value);
+                        handleSaveSummarySettings(summaryDay, summaryHour, e.target.value);
                       }}
                       disabled={summarySaving}
                       className="rounded-lg border border-border bg-background px-3 py-2 text-sm"

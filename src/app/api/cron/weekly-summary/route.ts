@@ -5,10 +5,34 @@ import { eq, and, gte, isNotNull } from "drizzle-orm";
 import { getMessagingProvider } from "@/lib/messaging";
 import { getUpcomingBirthdays, buildWeeklySummary } from "@/lib/weekly-summary";
 
+/** Extract the current day-of-week (0=Sun) and hour in a given IANA timezone. */
+function getUserLocalTime(
+  date: Date,
+  timezone: string
+): { dayOfWeek: number; hour: number } {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    hour12: false,
+  }).formatToParts(date);
+
+  const get = (type: string) =>
+    parseInt(parts.find((p) => p.type === type)!.value, 10);
+
+  // hour12:false can return 24 for midnight in some locales
+  const hour = get("hour") % 24;
+  // Reconstruct a date from the parts to derive day-of-week
+  const localDate = new Date(get("year"), get("month") - 1, get("day"));
+  return { dayOfWeek: localDate.getDay(), hour };
+}
+
 /**
  * GET /api/cron/weekly-summary
  * Runs every hour via Vercel cron. For each user with a linked Telegram,
- * checks if it's Sunday at their preferred hour in their timezone.
+ * checks if it's the user's chosen day/hour in their timezone.
  * Protected by CRON_SECRET via Authorization: Bearer header.
  */
 export async function GET(req: NextRequest) {
@@ -47,13 +71,12 @@ export async function GET(req: NextRequest) {
 
     try {
       // Check if it's the right day/hour in the user's timezone
-      const userNow = new Date(
-        now.toLocaleString("en-US", { timeZone: user.weeklySummaryTimezone })
+      const { dayOfWeek, hour: userHour } = getUserLocalTime(
+        now,
+        user.weeklySummaryTimezone
       );
-      const userDay = userNow.getDay(); // 0 = Sunday
-      const userHour = userNow.getHours();
 
-      if (userDay !== 0 || userHour !== user.weeklySummaryHour) {
+      if (dayOfWeek !== user.weeklySummaryDay || userHour !== user.weeklySummaryHour) {
         skipped++;
         continue;
       }

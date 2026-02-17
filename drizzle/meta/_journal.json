@@ -43,6 +43,13 @@
       "when": 1770768000000,
       "tag": "0005_add_ai_summary",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1770854400000,
+      "tag": "0006_add_weekly_summary_day",
+      "breakpoints": true
     }
   ]
 }

@@ -18,6 +18,7 @@ export async function GET() {
 
   const [user] = await db
     .select({
+      day: users.weeklySummaryDay,
       hour: users.weeklySummaryHour,
       timezone: users.weeklySummaryTimezone,
       lastSentAt: users.lastWeeklySummaryAt,
@@ -26,6 +27,7 @@ export async function GET() {
     .where(eq(users.id, userId));
 
   return NextResponse.json({
+    day: user.day,
     hour: user.hour,
     timezone: user.timezone,
     lastSentAt: user.lastSentAt,
@@ -44,7 +46,15 @@ export async function PUT(req: Request) {
   await ensureUser(userId);
 
   const body = await req.json();
-  const { hour, timezone } = body;
+  const { day, hour, timezone } = body;
+
+  // Validate day
+  if (typeof day !== "number" || day < 0 || day > 6 || !Number.isInteger(day)) {
+    return NextResponse.json(
+      { error: "Day must be an integer between 0 (Sunday) and 6 (Saturday)" },
+      { status: 400 }
+    );
+  }
 
   // Validate hour
   if (typeof hour !== "number" || hour < 0 || hour > 23 || !Number.isInteger(hour)) {
@@ -73,8 +83,12 @@ export async function PUT(req: Request) {
 
   await db
     .update(users)
-    .set({ weeklySummaryHour: hour, weeklySummaryTimezone: timezone })
+    .set({
+      weeklySummaryDay: day,
+      weeklySummaryHour: hour,
+      weeklySummaryTimezone: timezone,
+    })
     .where(eq(users.id, userId));
 
-  return NextResponse.json({ ok: true, hour, timezone });
+  return NextResponse.json({ ok: true, day, hour, timezone });
 }
