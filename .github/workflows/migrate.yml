@@ -1,0 +1,32 @@
+name: Run database migrations
+
+on:
+  push:
+    branches: [main, staging]
+    paths:
+      - "drizzle/**"
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run migrations (production)
+        if: github.ref == 'refs/heads/main'
+        run: npx drizzle-kit migrate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Run migrations (staging)
+        if: github.ref == 'refs/heads/staging'
+        run: npx drizzle-kit migrate
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
