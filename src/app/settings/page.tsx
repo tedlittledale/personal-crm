@@ -17,6 +17,7 @@ export default function SettingsPage() {
   // Weekly summary state
   const [summaryDay, setSummaryDay] = useState(0);
   const [summaryHour, setSummaryHour] = useState(20);
+  const [summaryMinute, setSummaryMinute] = useState(0);
   const [summaryTimezone, setSummaryTimezone] = useState("Europe/London");
   const [summaryLastSent, setSummaryLastSent] = useState<string | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(true);
@@ -52,6 +53,7 @@ export default function SettingsPage() {
         const data = await res.json();
         setSummaryDay(data.day);
         setSummaryHour(data.hour);
+        setSummaryMinute(data.minute ?? 0);
         setSummaryTimezone(data.timezone);
         setSummaryLastSent(data.lastSentAt);
       }
@@ -150,31 +152,35 @@ export default function SettingsPage() {
     }
   }
 
-  async function handleSaveSummarySettings(day: number, hour: number, timezone: string) {
+  async function handleSaveSummarySettings(day: number, hour: number, minute: number, timezone: string) {
     const prevDay = summaryDay;
     const prevHour = summaryHour;
+    const prevMinute = summaryMinute;
     const prevTimezone = summaryTimezone;
     // Update state optimistically so the controlled selects reflect the choice immediately
     setSummaryDay(day);
     setSummaryHour(hour);
+    setSummaryMinute(minute);
     setSummaryTimezone(timezone);
     setSummarySaving(true);
     try {
       const res = await fetch("/api/settings/weekly-summary", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ day, hour, timezone }),
+        body: JSON.stringify({ day, hour, minute, timezone }),
       });
       if (!res.ok) {
         // Revert on failure
         setSummaryDay(prevDay);
         setSummaryHour(prevHour);
+        setSummaryMinute(prevMinute);
         setSummaryTimezone(prevTimezone);
       }
     } catch {
       // Revert on network error
       setSummaryDay(prevDay);
       setSummaryHour(prevHour);
+      setSummaryMinute(prevMinute);
       setSummaryTimezone(prevTimezone);
     } finally {
       setSummarySaving(false);
@@ -334,7 +340,7 @@ export default function SettingsPage() {
                       value={summaryDay}
                       onChange={(e) => {
                         const newDay = parseInt(e.target.value, 10);
-                        handleSaveSummarySettings(newDay, summaryHour, summaryTimezone);
+                        handleSaveSummarySettings(newDay, summaryHour, summaryMinute, summaryTimezone);
                       }}
                       disabled={summarySaving}
                       className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
@@ -352,20 +358,22 @@ export default function SettingsPage() {
                   <div>
                     <label className="block text-xs text-muted-foreground mb-1">Time</label>
                     <select
-                      value={summaryHour}
+                      value={`${summaryHour}:${summaryMinute}`}
                       onChange={(e) => {
-                        const newHour = parseInt(e.target.value, 10);
-                        handleSaveSummarySettings(summaryDay, newHour, summaryTimezone);
+                        const [h, m] = e.target.value.split(":").map(Number);
+                        handleSaveSummarySettings(summaryDay, h, m, summaryTimezone);
                       }}
                       disabled={summarySaving}
                       className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
                     >
-                      {Array.from({ length: 24 }, (_, i) => {
-                        const period = i >= 12 ? "PM" : "AM";
-                        const display = i === 0 ? 12 : i > 12 ? i - 12 : i;
+                      {Array.from({ length: 48 }, (_, i) => {
+                        const h = Math.floor(i / 2);
+                        const m = (i % 2) * 30;
+                        const period = h >= 12 ? "PM" : "AM";
+                        const display = h === 0 ? 12 : h > 12 ? h - 12 : h;
                         return (
-                          <option key={i} value={i}>
-                            {display}:00 {period}
+                          <option key={i} value={`${h}:${m}`}>
+                            {display}:{m === 0 ? "00" : "30"} {period}
                           </option>
                         );
                       })}
@@ -377,7 +385,7 @@ export default function SettingsPage() {
                     <select
                       value={summaryTimezone}
                       onChange={(e) => {
-                        handleSaveSummarySettings(summaryDay, summaryHour, e.target.value);
+                        handleSaveSummarySettings(summaryDay, summaryHour, summaryMinute, e.target.value);
                       }}
                       disabled={summarySaving}
                       className="rounded-lg border border-border bg-background px-3 py-2 text-sm"

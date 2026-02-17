@@ -50,6 +50,13 @@
       "when": 1770854400000,
       "tag": "0006_add_weekly_summary_day",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1770940800000,
+      "tag": "0007_add_weekly_summary_minute",
+      "breakpoints": true
     }
   ]
 }

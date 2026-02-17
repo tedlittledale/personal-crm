@@ -17,6 +17,7 @@ export const users = pgTable("users", {
   telegramLinkToken: text("telegram_link_token"),
   weeklySummaryDay: integer("weekly_summary_day").default(0).notNull(), // 0=Sunday, 1=Monday, …, 6=Saturday
   weeklySummaryHour: integer("weekly_summary_hour").default(20).notNull(),
+  weeklySummaryMinute: integer("weekly_summary_minute").default(0).notNull(), // 0 or 30
   weeklySummaryTimezone: text("weekly_summary_timezone")
     .default("Europe/London")
     .notNull(),

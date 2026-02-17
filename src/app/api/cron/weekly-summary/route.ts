@@ -5,17 +5,18 @@ import { eq, and, gte, isNotNull } from "drizzle-orm";
 import { getMessagingProvider } from "@/lib/messaging";
 import { getUpcomingBirthdays, buildWeeklySummary } from "@/lib/weekly-summary";
 
-/** Extract the current day-of-week (0=Sun) and hour in a given IANA timezone. */
+/** Extract the current day-of-week (0=Sun), hour, and minute in a given IANA timezone. */
 function getUserLocalTime(
   date: Date,
   timezone: string
-): { dayOfWeek: number; hour: number } {
+): { dayOfWeek: number; hour: number; minute: number } {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: timezone,
     year: "numeric",
     month: "numeric",
     day: "numeric",
     hour: "numeric",
+    minute: "numeric",
     hour12: false,
   }).formatToParts(date);
 
@@ -24,9 +25,10 @@ function getUserLocalTime(
 
   // hour12:false can return 24 for midnight in some locales
   const hour = get("hour") % 24;
+  const minute = get("minute");
   // Reconstruct a date from the parts to derive day-of-week
   const localDate = new Date(get("year"), get("month") - 1, get("day"));
-  return { dayOfWeek: localDate.getDay(), hour };
+  return { dayOfWeek: localDate.getDay(), hour, minute };
 }
 
 /**
@@ -70,21 +72,28 @@ export async function GET(req: NextRequest) {
     if (!user.telegramChatId) continue;
 
     try {
-      // Check if it's the right day/hour in the user's timezone
-      const { dayOfWeek, hour: userHour } = getUserLocalTime(
+      // Check if it's the right day/hour/minute in the user's timezone
+      const { dayOfWeek, hour: userHour, minute: userMinute } = getUserLocalTime(
         now,
         user.weeklySummaryTimezone
       );
 
-      if (dayOfWeek !== user.weeklySummaryDay || userHour !== user.weeklySummaryHour) {
+      // Round current minute to the nearest 30-min slot (0 or 30)
+      const currentSlot = userMinute < 30 ? 0 : 30;
+
+      if (
+        dayOfWeek !== user.weeklySummaryDay ||
+        userHour !== user.weeklySummaryHour ||
+        currentSlot !== user.weeklySummaryMinute
+      ) {
         skipped++;
         continue;
       }
 
-      // Prevent duplicate sends within the same hour window
+      // Prevent duplicate sends within the same 30-minute window
       if (user.lastWeeklySummaryAt) {
-        const hourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-        if (user.lastWeeklySummaryAt > hourAgo) {
+        const thirtyMinsAgo = new Date(now.getTime() - 30 * 60 * 1000);
+        if (user.lastWeeklySummaryAt > thirtyMinsAgo) {
           skipped++;
           continue;
         }
