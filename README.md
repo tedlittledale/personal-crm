@@ -1,36 +1,121 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# People Notes (Personal CRM)
+
+A personal CRM for managing contacts with AI-powered voice note ingestion, natural language search, and Telegram bot integration. Built with Next.js 16, deployed on Vercel.
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Environment Variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Copy the required env vars into `.env.local`:
 
-## Learn More
+```
+DATABASE_URL
+CLERK_SECRET_KEY
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+CLERK_WEBHOOK_SECRET
+ANTHROPIC_API_KEY
+TELEGRAM_BOT_TOKEN
+TELEGRAM_BOT_USERNAME
+CRON_SECRET
+```
 
-To learn more about Next.js, take a look at the following resources:
+Optional: `APP_URL` / `NEXT_PUBLIC_APP_URL` (falls back to `VERCEL_PROJECT_PRODUCTION_URL`)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Feature Development Workflow
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 1. Create a feature branch
 
-## Deploy on Vercel
+```bash
+git checkout -b feature/my-feature
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### 2. Develop locally against staging
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run dev:staging
+```
+
+This runs the dev server against the staging database, keeping production data safe.
+
+### 3. Schema changes (if any)
+
+```bash
+# Edit src/db/schema.ts, then:
+npx drizzle-kit generate          # generate migration
+npm run db:migrate:staging        # apply to staging first
+npm run dev:staging               # verify it works
+```
+
+### 4. Push & preview
+
+```bash
+git push -u origin feature/my-feature
+```
+
+Vercel preview deployments automatically use the staging database.
+
+### 5. Merge to main
+
+After merging, the production deployment uses the production database. Run migrations in prod:
+
+```bash
+npx drizzle-kit migrate
+```
+
+### 6. Periodically re-sync staging
+
+When staging data gets stale or you want a fresh copy of prod:
+
+```bash
+npm run db:sync-staging
+```
+
+## Staging Environment
+
+A separate Supabase project is used for staging/preview deployments so that migrations and features can be tested before hitting production.
+
+### Setup
+
+1. Copy `.env.staging.template` to `.env.staging` and fill in the staging database password and other keys from `.env.local`
+2. Add `PROD_DATABASE_URL_DIRECT` to `.env.local` (your production direct connection string, port 5432)
+3. Install PostgreSQL client tools: `brew install libpq`
+
+### Staging Commands
+
+| Command | Description |
+|---|---|
+| `npm run dev:staging` | Start dev server against staging DB |
+| `npm run db:migrate:staging` | Run pending migrations on staging |
+| `npm run db:push:staging` | Push schema directly to staging (skip migrations) |
+| `npm run db:sync-staging` | Copy production data to staging (pg_dump/psql) |
+
+### Vercel Configuration
+
+- `DATABASE_URL` scoped to **Production** — production pooler URL (port 6543)
+- `DATABASE_URL` scoped to **Preview** — staging pooler URL (port 6543)
+
+### Env Files
+
+| File | Purpose |
+|---|---|
+| `.env.local` | Production database + `PROD_DATABASE_URL_DIRECT` |
+| `.env.staging` | Staging database + `STAGING_DATABASE_URL_DIRECT` |
+| `.env.staging.template` | Template for `.env.staging` (committed to repo) |
+
+## Scripts
+
+| Command | Description |
+|---|---|
+| `npm run dev` | Start Next.js dev server |
+| `npm run build` | Production build |
+| `npm run lint` | Run ESLint |
+| `npx drizzle-kit generate` | Generate a migration from schema changes |
+| `npx drizzle-kit migrate` | Run pending migrations (production) |
+| `npx drizzle-kit push` | Push schema changes directly to the database |
