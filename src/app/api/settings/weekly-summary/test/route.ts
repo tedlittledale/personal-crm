@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
-import { users, people } from "@/db/schema";
-import { eq, and, gte, lt } from "drizzle-orm";
+import { users } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { ensureUser } from "@/lib/ensure-user";
 import { getMessagingProvider } from "@/lib/messaging";
-import { getUpcomingBirthdays, buildWeeklySummary } from "@/lib/weekly-summary";
+import { getWeeklySummaryData, buildWeeklySummary } from "@/lib/weekly-summary";
 
 /**
  * POST /api/settings/weekly-summary/test
@@ -30,28 +30,8 @@ export async function POST() {
     );
   }
 
-  const now = new Date();
-  const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-
-  const newContacts = await db
-    .select()
-    .from(people)
-    .where(
-      and(eq(people.userId, userId), gte(people.createdAt, oneWeekAgo))
-    );
-
-  const updatedContacts = await db
-    .select()
-    .from(people)
-    .where(
-      and(
-        eq(people.userId, userId),
-        gte(people.updatedAt, oneWeekAgo),
-        lt(people.createdAt, oneWeekAgo)
-      )
-    );
-
-  const upcomingBirthdays = await getUpcomingBirthdays(userId, now, 7);
+  const { newContacts, updatedContacts, upcomingBirthdays } =
+    await getWeeklySummaryData(userId);
 
   const message =
     newContacts.length === 0 && updatedContacts.length === 0 && upcomingBirthdays.length === 0

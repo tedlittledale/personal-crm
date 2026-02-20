@@ -1,6 +1,45 @@
 import { db } from "@/db";
 import { people } from "@/db/schema";
-import { eq, and, isNotNull } from "drizzle-orm";
+import { eq, and, gte, lt, isNotNull } from "drizzle-orm";
+
+type Person = typeof people.$inferSelect;
+
+export interface WeeklySummaryData {
+  newContacts: Person[];
+  updatedContacts: Person[];
+  upcomingBirthdays: Person[];
+}
+
+/**
+ * Fetch all data needed for a weekly summary: new contacts, recently updated
+ * contacts, and upcoming birthdays for the given user.
+ */
+export async function getWeeklySummaryData(
+  userId: string,
+  now: Date = new Date()
+): Promise<WeeklySummaryData> {
+  const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+  const [newContacts, updatedContacts, upcomingBirthdays] = await Promise.all([
+    db
+      .select()
+      .from(people)
+      .where(and(eq(people.userId, userId), gte(people.createdAt, oneWeekAgo))),
+    db
+      .select()
+      .from(people)
+      .where(
+        and(
+          eq(people.userId, userId),
+          gte(people.updatedAt, oneWeekAgo),
+          lt(people.createdAt, oneWeekAgo)
+        )
+      ),
+    getUpcomingBirthdays(userId, now, 7),
+  ]);
+
+  return { newContacts, updatedContacts, upcomingBirthdays };
+}
 
 const MONTH_NAMES = [
   "",
