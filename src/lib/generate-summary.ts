@@ -74,15 +74,15 @@ export async function generateContactSummary(
 const CHANGE_DESCRIPTION_PROMPT = `You summarize what changed when a contact was updated. You will receive the before and after state of a contact record.
 
 Rules:
-- Write exactly ONE concise sentence (under 120 characters if possible)
+- Write one or two concise sentences (under 200 characters if possible)
 - Describe what was added, changed, or removed in plain language
-- Use past tense (e.g. "Added phone number and updated role to CTO")
-- Focus on the meaningful changes, not every tiny edit
-- If a field went from empty to filled, say "Added [field]"
-- If a field changed values, say "Updated [field] to [new value]" (only include new value if short)
+- Use past tense (e.g. "Added phone number and updated role to CTO at Acme Corp")
+- Include the new values where they add useful context (e.g. the new role, company, or personal details)
+- If a field went from empty to filled, say "Added [field]" and include the value
+- If a field changed values, say "Updated [field] to [new value]"
 - If a field was cleared, say "Removed [field]"
 - Do not mention the person's name
-- Return ONLY the description sentence, nothing else`;
+- Return ONLY the description, nothing else`;
 
 function describeChanges(before: ContactFields, after: ContactFields): string {
   const fields: { key: keyof ContactFields; label: string }[] = [
