@@ -7,6 +7,7 @@ type Person = {
   role: string | null;
   source: string | null;
   aiSummary?: string | null;
+  lastChangeDescription?: string | null;
   updatedAt: Date | string;
 };
 
@@ -38,6 +39,11 @@ export function PeopleList({ people }: { people: Person[] }) {
                   person.source ||
                   "No details"}
               </p>
+              {person.lastChangeDescription && (
+                <p className="text-xs text-muted-foreground/70 truncate mt-0.5 italic">
+                  {person.lastChangeDescription}
+                </p>
+              )}
             </div>
             <span className="text-xs text-muted-foreground shrink-0 ml-4">
               {new Date(person.updatedAt).toLocaleDateString()}

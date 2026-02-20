@@ -1,0 +1,1 @@
+ALTER TABLE "people" ADD COLUMN "last_change_description" text;

@@ -45,6 +45,7 @@ export const people = pgTable(
     birthdayDay: integer("birthday_day"), // 1-31
     children: text("children"),
     aiSummary: text("ai_summary"),
+    lastChangeDescription: text("last_change_description"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },

@@ -122,12 +122,12 @@ export function buildWeeklySummary(
     sections.push(`✏️ Recently Updated (${updatedContacts.length}):`);
     for (const p of updatedContacts) {
       const details = [p.role, p.company].filter(Boolean).join(" at ");
-      const note = p.notes
-        ? ` — ${p.notes.length > 100 ? p.notes.slice(0, 100) + "…" : p.notes}`
+      const change = p.lastChangeDescription
+        ? ` — ${p.lastChangeDescription}`
         : p.aiSummary
           ? ` — ${p.aiSummary}`
           : "";
-      sections.push(`  • ${p.name}${details ? ` (${details})` : ""}${note}`);
+      sections.push(`  • ${p.name}${details ? ` (${details})` : ""}${change}`);
     }
     sections.push("");
   }
