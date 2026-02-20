@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users, people } from "@/db/schema";
-import { eq, and, gte, isNotNull } from "drizzle-orm";
+import { eq, and, gte, lt, isNotNull } from "drizzle-orm";
 import { getMessagingProvider } from "@/lib/messaging";
 import { getUpcomingBirthdays, buildWeeklySummary } from "@/lib/weekly-summary";
 
@@ -107,17 +107,37 @@ export async function GET(req: NextRequest) {
           and(eq(people.userId, user.id), gte(people.createdAt, oneWeekAgo))
         );
 
+      // Get contacts updated in the last 7 days (excluding newly created ones)
+      const updatedContacts = await db
+        .select()
+        .from(people)
+        .where(
+          and(
+            eq(people.userId, user.id),
+            gte(people.updatedAt, oneWeekAgo),
+            lt(people.createdAt, oneWeekAgo)
+          )
+        );
+
       // Get contacts with upcoming birthdays (next 7 days)
       const upcomingBirthdays = await getUpcomingBirthdays(user.id, now, 7);
 
       // Skip if nothing to report
-      if (newContacts.length === 0 && upcomingBirthdays.length === 0) {
+      if (
+        newContacts.length === 0 &&
+        updatedContacts.length === 0 &&
+        upcomingBirthdays.length === 0
+      ) {
         skipped++;
         continue;
       }
 
       // Build and send the message
-      const message = buildWeeklySummary(newContacts, upcomingBirthdays);
+      const message = buildWeeklySummary(
+        newContacts,
+        upcomingBirthdays,
+        updatedContacts
+      );
       await messaging.sendMessage(user.telegramChatId, message);
 
       // Update lastWeeklySummaryAt
