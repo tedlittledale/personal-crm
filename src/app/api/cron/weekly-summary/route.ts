@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { users, people } from "@/db/schema";
-import { eq, and, gte, lt, isNotNull } from "drizzle-orm";
+import { users } from "@/db/schema";
+import { eq, isNotNull } from "drizzle-orm";
 import { getMessagingProvider } from "@/lib/messaging";
-import { getUpcomingBirthdays, buildWeeklySummary } from "@/lib/weekly-summary";
+import { getWeeklySummaryData, buildWeeklySummary } from "@/lib/weekly-summary";
 
 /** Extract the current day-of-week (0=Sun), hour, and minute in a given IANA timezone. */
 function getUserLocalTime(
@@ -56,7 +56,6 @@ export async function GET(req: NextRequest) {
 
   const messaging = getMessagingProvider();
   const now = new Date();
-  const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
   // Find all users with telegram linked
   const linkedUsers = await db
@@ -99,28 +98,8 @@ export async function GET(req: NextRequest) {
         }
       }
 
-      // Get contacts added in the last 7 days
-      const newContacts = await db
-        .select()
-        .from(people)
-        .where(
-          and(eq(people.userId, user.id), gte(people.createdAt, oneWeekAgo))
-        );
-
-      // Get contacts updated in the last 7 days (excluding newly created ones)
-      const updatedContacts = await db
-        .select()
-        .from(people)
-        .where(
-          and(
-            eq(people.userId, user.id),
-            gte(people.updatedAt, oneWeekAgo),
-            lt(people.createdAt, oneWeekAgo)
-          )
-        );
-
-      // Get contacts with upcoming birthdays (next 7 days)
-      const upcomingBirthdays = await getUpcomingBirthdays(user.id, now, 7);
+      const { newContacts, updatedContacts, upcomingBirthdays } =
+        await getWeeklySummaryData(user.id, now);
 
       // Skip if nothing to report
       if (
