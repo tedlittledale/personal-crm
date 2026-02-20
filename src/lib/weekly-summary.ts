@@ -62,7 +62,8 @@ export async function getUpcomingBirthdays(
 
 export function buildWeeklySummary(
   newContacts: (typeof people.$inferSelect)[],
-  upcomingBirthdays: (typeof people.$inferSelect)[]
+  upcomingBirthdays: (typeof people.$inferSelect)[],
+  updatedContacts: (typeof people.$inferSelect)[] = []
 ): string {
   const sections: string[] = [];
 
@@ -74,6 +75,20 @@ export function buildWeeklySummary(
       const details = [p.role, p.company].filter(Boolean).join(" at ");
       const source = p.source ? ` — ${p.source}` : "";
       sections.push(`  • ${p.name}${details ? ` (${details})` : ""}${source}`);
+    }
+    sections.push("");
+  }
+
+  if (updatedContacts.length > 0) {
+    sections.push(`✏️ Recently Updated (${updatedContacts.length}):`);
+    for (const p of updatedContacts) {
+      const details = [p.role, p.company].filter(Boolean).join(" at ");
+      const note = p.notes
+        ? ` — ${p.notes.length > 100 ? p.notes.slice(0, 100) + "…" : p.notes}`
+        : p.aiSummary
+          ? ` — ${p.aiSummary}`
+          : "";
+      sections.push(`  • ${p.name}${details ? ` (${details})` : ""}${note}`);
     }
     sections.push("");
   }
