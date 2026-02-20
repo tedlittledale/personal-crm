@@ -57,6 +57,13 @@
       "when": 1770940800000,
       "tag": "0007_add_weekly_summary_minute",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1771597446402,
+      "tag": "0008_lowly_gambit",
+      "breakpoints": true
     }
   ]
 }

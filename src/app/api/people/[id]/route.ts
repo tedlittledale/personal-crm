@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
-import { generateContactSummary } from "@/lib/generate-summary";
+import { generateContactSummary, generateChangeDescription } from "@/lib/generate-summary";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -43,9 +43,9 @@ export async function PUT(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Name cannot be empty" }, { status: 400 });
   }
 
-  // Verify ownership first
+  // Fetch full existing record (needed for ownership check + change description)
   const [existing] = await db
-    .select({ id: people.id })
+    .select()
     .from(people)
     .where(and(eq(people.id, id), eq(people.userId, userId)));
 
@@ -72,15 +72,21 @@ export async function PUT(req: NextRequest, { params }: Params) {
     .where(eq(people.id, id))
     .returning();
 
-  // Regenerate AI summary in the background with the updated data
-  generateContactSummary(updated)
-    .then((aiSummary) =>
+  // Regenerate AI summary and change description in the background
+  Promise.all([
+    generateContactSummary(updated),
+    generateChangeDescription(existing, updated),
+  ])
+    .then(([aiSummary, lastChangeDescription]) =>
       db
         .update(people)
-        .set({ aiSummary })
+        .set({
+          aiSummary,
+          ...(lastChangeDescription && { lastChangeDescription }),
+        })
         .where(eq(people.id, id))
     )
-    .catch((err) => console.error("Failed to generate summary:", err));
+    .catch((err) => console.error("Failed to generate summaries:", err));
 
   return NextResponse.json(updated);
 }
