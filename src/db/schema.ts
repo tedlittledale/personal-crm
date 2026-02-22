@@ -6,6 +6,7 @@ import {
   jsonb,
   index,
   integer,
+  boolean,
 } from "drizzle-orm/pg-core";
 
 // Users table - synced from Clerk via webhook
@@ -22,6 +23,10 @@ export const users = pgTable("users", {
     .default("Europe/London")
     .notNull(),
   lastWeeklySummaryAt: timestamp("last_weekly_summary_at"),
+  birthdayRemindersEnabled: boolean("birthday_reminders_enabled")
+    .default(true)
+    .notNull(),
+  lastBirthdayReminderAt: timestamp("last_birthday_reminder_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
