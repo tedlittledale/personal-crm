@@ -25,6 +25,11 @@ export default function SettingsPage() {
   const [summaryTesting, setSummaryTesting] = useState(false);
   const [summaryTestResult, setSummaryTestResult] = useState<{ ok: boolean; message: string } | null>(null);
 
+  // Birthday reminders state
+  const [birthdayReminders, setBirthdayReminders] = useState(true);
+  const [birthdayRemindersLoading, setBirthdayRemindersLoading] = useState(true);
+  const [birthdayRemindersSaving, setBirthdayRemindersSaving] = useState(false);
+
   // Telegram state
   const [telegramLinked, setTelegramLinked] = useState(false);
   const [telegramLoading, setTelegramLoading] = useState(true);
@@ -62,6 +67,18 @@ export default function SettingsPage() {
     }
   }, []);
 
+  const fetchBirthdayReminders = useCallback(async () => {
+    try {
+      const res = await fetch("/api/settings/birthday-reminders");
+      if (res.ok) {
+        const data = await res.json();
+        setBirthdayReminders(data.enabled);
+      }
+    } finally {
+      setBirthdayRemindersLoading(false);
+    }
+  }, []);
+
   const fetchTelegramStatus = useCallback(async () => {
     try {
       const res = await fetch("/api/settings/telegram/status");
@@ -78,7 +95,8 @@ export default function SettingsPage() {
     fetchApiKey();
     fetchTelegramStatus();
     fetchSummarySettings();
-  }, [fetchApiKey, fetchTelegramStatus, fetchSummarySettings]);
+    fetchBirthdayReminders();
+  }, [fetchApiKey, fetchTelegramStatus, fetchSummarySettings, fetchBirthdayReminders]);
 
   // Poll for link status while the deep link is shown
   useEffect(() => {
@@ -204,6 +222,26 @@ export default function SettingsPage() {
       setSummaryTestResult({ ok: false, message: "Network error. Please try again." });
     } finally {
       setSummaryTesting(false);
+    }
+  }
+
+  async function handleToggleBirthdayReminders(enabled: boolean) {
+    const prev = birthdayReminders;
+    setBirthdayReminders(enabled);
+    setBirthdayRemindersSaving(true);
+    try {
+      const res = await fetch("/api/settings/birthday-reminders", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled }),
+      });
+      if (!res.ok) {
+        setBirthdayReminders(prev);
+      }
+    } catch {
+      setBirthdayReminders(prev);
+    } finally {
+      setBirthdayRemindersSaving(false);
     }
   }
 
@@ -444,6 +482,34 @@ export default function SettingsPage() {
                   </p>
                 )}
               </div>
+            )}
+          </div>
+        )}
+
+        {/* Birthday Reminders - shown when Telegram is linked */}
+        {telegramLinked && (
+          <div className="space-y-3 rounded-lg border border-border p-4">
+            <h3 className="text-sm font-medium">Birthday Reminders</h3>
+            <p className="text-xs text-muted-foreground">
+              Receive a Telegram message at 9 AM on your contacts&rsquo; birthdays.
+            </p>
+
+            {birthdayRemindersLoading ? (
+              <div className="h-6 w-48 rounded bg-muted animate-pulse" />
+            ) : (
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={birthdayReminders}
+                  onChange={(e) => handleToggleBirthdayReminders(e.target.checked)}
+                  disabled={birthdayRemindersSaving}
+                  className="h-4 w-4 rounded border-border accent-primary"
+                />
+                <span className="text-sm">Send birthday reminders</span>
+                {birthdayRemindersSaving && (
+                  <span className="text-xs text-muted-foreground">Saving...</span>
+                )}
+              </label>
             )}
           </div>
         )}
