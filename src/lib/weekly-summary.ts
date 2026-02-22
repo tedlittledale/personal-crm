@@ -35,7 +35,7 @@ export async function getWeeklySummaryData(
           lt(people.createdAt, oneWeekAgo)
         )
       ),
-    getUpcomingBirthdays(userId, now, 7),
+    getUpcomingBirthdays(userId, now, 14),
   ]);
 
   return { newContacts, updatedContacts, upcomingBirthdays };
