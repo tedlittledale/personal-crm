@@ -54,11 +54,13 @@ function getUserLocalTime(
  * Protected by CRON_SECRET via Authorization: Bearer header.
  */
 export async function GET(req: NextRequest) {
+  console.log("[birthday-reminder cron] Invoked at", new Date().toISOString());
+
   const authHeader = req.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
 
   if (!cronSecret) {
-    console.error("CRON_SECRET not configured");
+    console.error("[birthday-reminder cron] CRON_SECRET not configured");
     return NextResponse.json(
       { error: "Server misconfigured" },
       { status: 500 }
@@ -66,6 +68,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (authHeader !== `Bearer ${cronSecret}`) {
+    console.error("[birthday-reminder cron] Unauthorized - auth header mismatch");
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -99,8 +102,11 @@ export async function GET(req: NextRequest) {
       // Round current minute to nearest 30-min slot
       const currentSlot = minute < 30 ? 0 : 30;
 
+      console.log(`[birthday-reminder cron] User ${user.id}: local time hour=${hour} slot=${currentSlot} month=${month} day=${day} tz=${user.weeklySummaryTimezone}`);
+
       // Only send at 9:00 AM in the user's timezone
       if (hour !== 9 || currentSlot !== 0) {
+        console.log(`[birthday-reminder cron] User ${user.id}: skipped (not 9:00 AM, currently ${hour}:${currentSlot === 0 ? '00' : '30'})`);
         skipped++;
         continue;
       }
@@ -109,6 +115,7 @@ export async function GET(req: NextRequest) {
       if (user.lastBirthdayReminderAt) {
         const thirtyMinsAgo = new Date(now.getTime() - 30 * 60 * 1000);
         if (user.lastBirthdayReminderAt > thirtyMinsAgo) {
+          console.log(`[birthday-reminder cron] User ${user.id}: skipped (duplicate prevention)`);
           skipped++;
           continue;
         }
@@ -127,9 +134,12 @@ export async function GET(req: NextRequest) {
         );
 
       if (birthdayContacts.length === 0) {
+        console.log(`[birthday-reminder cron] User ${user.id}: skipped (no birthdays today)`);
         skipped++;
         continue;
       }
+
+      console.log(`[birthday-reminder cron] User ${user.id}: sending reminder for ${birthdayContacts.length} birthday(s)`);
 
       // Build and send the birthday reminder message
       const lines: string[] = [];
@@ -171,6 +181,8 @@ export async function GET(req: NextRequest) {
       errors++;
     }
   }
+
+  console.log(`[birthday-reminder cron] Done: checked=${eligibleUsers.length} sent=${sent} skipped=${skipped} errors=${errors}`);
 
   return NextResponse.json({
     ok: true,

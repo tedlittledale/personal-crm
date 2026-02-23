@@ -38,12 +38,14 @@ function getUserLocalTime(
  * Protected by CRON_SECRET via Authorization: Bearer header.
  */
 export async function GET(req: NextRequest) {
+  console.log("[weekly-summary cron] Invoked at", new Date().toISOString());
+
   // Verify cron secret
   const authHeader = req.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
 
   if (!cronSecret) {
-    console.error("CRON_SECRET not configured");
+    console.error("[weekly-summary cron] CRON_SECRET not configured");
     return NextResponse.json(
       { error: "Server misconfigured" },
       { status: 500 }
@@ -51,6 +53,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (authHeader !== `Bearer ${cronSecret}`) {
+    console.error("[weekly-summary cron] Unauthorized - auth header mismatch");
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -80,11 +83,14 @@ export async function GET(req: NextRequest) {
       // Round current minute to the nearest 30-min slot (0 or 30)
       const currentSlot = userMinute < 30 ? 0 : 30;
 
+      console.log(`[weekly-summary cron] User ${user.id}: local time dayOfWeek=${dayOfWeek} hour=${userHour} slot=${currentSlot}, config day=${user.weeklySummaryDay} hour=${user.weeklySummaryHour} minute=${user.weeklySummaryMinute} tz=${user.weeklySummaryTimezone}`);
+
       if (
         dayOfWeek !== user.weeklySummaryDay ||
         userHour !== user.weeklySummaryHour ||
         currentSlot !== user.weeklySummaryMinute
       ) {
+        console.log(`[weekly-summary cron] User ${user.id}: skipped (schedule mismatch)`);
         skipped++;
         continue;
       }
@@ -93,6 +99,7 @@ export async function GET(req: NextRequest) {
       if (user.lastWeeklySummaryAt) {
         const thirtyMinsAgo = new Date(now.getTime() - 30 * 60 * 1000);
         if (user.lastWeeklySummaryAt > thirtyMinsAgo) {
+          console.log(`[weekly-summary cron] User ${user.id}: skipped (duplicate prevention, last sent ${user.lastWeeklySummaryAt.toISOString()})`);
           skipped++;
           continue;
         }
@@ -107,9 +114,12 @@ export async function GET(req: NextRequest) {
         updatedContacts.length === 0 &&
         upcomingBirthdays.length === 0
       ) {
+        console.log(`[weekly-summary cron] User ${user.id}: skipped (no data to report)`);
         skipped++;
         continue;
       }
+
+      console.log(`[weekly-summary cron] User ${user.id}: sending summary (new=${newContacts.length}, updated=${updatedContacts.length}, birthdays=${upcomingBirthdays.length})`);
 
       // Build and send the message
       const message = buildWeeklySummary(
@@ -131,6 +141,8 @@ export async function GET(req: NextRequest) {
       errors++;
     }
   }
+
+  console.log(`[weekly-summary cron] Done: checked=${linkedUsers.length} sent=${sent} skipped=${skipped} errors=${errors}`);
 
   return NextResponse.json({
     ok: true,
