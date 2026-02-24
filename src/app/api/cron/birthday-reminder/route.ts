@@ -49,7 +49,7 @@ function getUserLocalTime(
 /**
  * GET /api/cron/birthday-reminder
  * Runs every 30 minutes via Vercel cron. For each user with birthday reminders
- * enabled and a linked Telegram account, checks if it's 9:00 AM in their timezone
+ * enabled and a linked Telegram account, checks if it's 8:00 AM in their timezone
  * and sends reminders for contacts whose birthday is today.
  * Protected by CRON_SECRET via Authorization: Bearer header.
  */
@@ -104,9 +104,9 @@ export async function GET(req: NextRequest) {
 
       console.log(`[birthday-reminder cron] User ${user.id}: local time hour=${hour} slot=${currentSlot} month=${month} day=${day} tz=${user.weeklySummaryTimezone}`);
 
-      // Only send at 9:00 AM in the user's timezone
-      if (hour !== 9 || currentSlot !== 0) {
-        console.log(`[birthday-reminder cron] User ${user.id}: skipped (not 9:00 AM, currently ${hour}:${currentSlot === 0 ? '00' : '30'})`);
+      // Only send at 8:00 AM in the user's timezone
+      if (hour !== 8 || currentSlot !== 0) {
+        console.log(`[birthday-reminder cron] User ${user.id}: skipped (not 8:00 AM, currently ${hour}:${currentSlot === 0 ? '00' : '30'})`);
         skipped++;
         continue;
       }
