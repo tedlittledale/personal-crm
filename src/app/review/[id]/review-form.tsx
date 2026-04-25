@@ -9,6 +9,7 @@ type ReviewData = {
   role: string | null;
   email: string | null;
   phone: string | null;
+  address: string | null;
   personalDetails: string | null;
   notes: string | null;
   source: string | null;
@@ -51,6 +52,7 @@ function mergeData(existing: ExistingPerson, extracted: ReviewData): ExistingPer
     role: existing.role || extracted.role,
     email: existing.email || extracted.email,
     phone: existing.phone || extracted.phone,
+    address: existing.address || extracted.address,
     source: existing.source || extracted.source,
     birthdayMonth: existing.birthdayMonth ?? extracted.birthdayMonth,
     birthdayDay: existing.birthdayDay ?? extracted.birthdayDay,
@@ -100,6 +102,7 @@ export function ReviewForm({
         role: person.role,
         email: person.email,
         phone: person.phone,
+        address: person.address,
         personalDetails: person.personalDetails,
         notes: person.notes,
         source: person.source,
@@ -139,6 +142,7 @@ export function ReviewForm({
       role: fd.get("role") as string,
       email: fd.get("email") as string,
       phone: fd.get("phone") as string,
+      address: fd.get("address") as string,
       personalDetails: fd.get("personalDetails") as string,
       notes: fd.get("notes") as string,
       source: fd.get("source") as string,
@@ -376,6 +380,20 @@ export function ReviewForm({
               className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
             />
           </div>
+        </div>
+
+        <div>
+          <label htmlFor="address" className="block text-sm font-medium mb-1">
+            Address
+          </label>
+          <textarea
+            id="address"
+            name="address"
+            rows={2}
+            key={`address-${selectedPerson?.id ?? "new"}`}
+            defaultValue={formData.address ?? ""}
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-y"
+          />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

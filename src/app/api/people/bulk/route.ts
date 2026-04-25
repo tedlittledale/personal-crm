@@ -47,6 +47,7 @@ export async function POST(req: NextRequest) {
         role?: string | null;
         email?: string | null;
         phone?: string | null;
+        address?: string | null;
         personalDetails?: string | null;
         notes?: string | null;
         source?: string | null;
@@ -60,6 +61,7 @@ export async function POST(req: NextRequest) {
         role: c.role?.trim() || null,
         email: c.email?.trim() || null,
         phone: c.phone?.trim() || null,
+        address: c.address?.trim() || null,
         personalDetails: c.personalDetails?.trim() || null,
         notes: c.notes?.trim() || null,
         source: c.source?.trim() || null,

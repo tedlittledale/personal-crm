@@ -85,6 +85,7 @@ export default async function ReviewPage({
           role: (extracted.role as string) || null,
           email: (extracted.email as string) || null,
           phone: (extracted.phone as string) || null,
+          address: (extracted.address as string) || null,
           personalDetails: (extracted.personalDetails as string) || (extracted.personal_details as string) || null,
           notes: (extracted.notes as string) || null,
           source: (extracted.source as string) || null,

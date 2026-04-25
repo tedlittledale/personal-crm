@@ -9,6 +9,7 @@ type ExtractedContact = {
   role: string | null;
   email: string | null;
   phone: string | null;
+  address: string | null;
   personalDetails: string | null;
   notes: string | null;
   source: string | null;
@@ -323,6 +324,12 @@ export default function ImportPage() {
                           label="Phone"
                           value={contact.phone || ""}
                           onChange={(v) => updateContact(i, "phone", v)}
+                        />
+                        <EditField
+                          label="Address"
+                          value={contact.address || ""}
+                          onChange={(v) => updateContact(i, "address", v)}
+                          multiline
                         />
                         <div>
                           <label className="block text-xs font-medium text-muted-foreground mb-1">

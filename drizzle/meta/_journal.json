@@ -71,6 +71,13 @@
       "when": 1771757141990,
       "tag": "0009_swift_landau",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1777680000000,
+      "tag": "0010_add_address",
+      "breakpoints": true
     }
   ]
 }

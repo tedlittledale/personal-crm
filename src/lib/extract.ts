@@ -16,6 +16,7 @@ export type ExtractedPerson = {
   role: string | null;
   email: string | null;
   phone: string | null;
+  address: string | null;
   personalDetails: string | null;
   notes: string | null;
   source: string | null;
@@ -44,6 +45,7 @@ The JSON must have these fields:
 - role (string or null): Their job title or role
 - email (string or null): Their email address if mentioned
 - phone (string or null): Their phone number if mentioned
+- address (string or null): Their physical/postal address (home, work, or city) if mentioned
 - personalDetails (string or null): Personal information like family, pets, hobbies, interests, preferences
 - notes (string or null): Any other relevant information that doesn't fit above
 - source (string or null): Where/how the speaker met this person (event, introduction, context)
@@ -107,6 +109,7 @@ export async function extractPersonFromTranscript(
     role: parsed.role || null,
     email: parsed.email || null,
     phone: parsed.phone || null,
+    address: parsed.address || null,
     personalDetails: parsed.personalDetails || parsed.personal_details || null,
     notes: parsed.notes || null,
     source: parsed.source || null,
