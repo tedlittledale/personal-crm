@@ -22,6 +22,7 @@ const contactSchema = z
     role: z.string().nullable().optional(),
     email: z.string().nullable().optional(),
     phone: z.string().nullable().optional(),
+    address: z.string().nullable().optional(),
     personalDetails: z.string().nullable().optional(),
     personal_details: z.string().nullable().optional(), // handle snake_case variant
     notes: z.string().nullable().optional(),
@@ -39,6 +40,7 @@ const contactSchema = z
       role: val.role?.trim() || null,
       email: val.email?.trim() || null,
       phone: val.phone?.trim() || null,
+      address: val.address?.trim() || null,
       personalDetails:
         val.personalDetails?.trim() || val.personal_details?.trim() || null,
       notes: val.notes?.trim() || null,
@@ -73,6 +75,7 @@ Return ONLY a valid JSON array of objects. Each object must have these fields:
 - role (string or null): Their job title or role
 - email (string or null): Their email address if available
 - phone (string or null): Their phone number if available
+- address (string or null): Their physical/postal address if available
 - personalDetails (string or null): Personal information like family, pets, hobbies, interests, preferences
 - notes (string or null): Any other relevant information that doesn't fit above
 - source (string or null): Where/how the user knows this person, or any context about the relationship

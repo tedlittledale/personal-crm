@@ -16,6 +16,7 @@ type ContactFields = {
   role?: string | null;
   email?: string | null;
   phone?: string | null;
+  address?: string | null;
   personalDetails?: string | null;
   notes?: string | null;
   source?: string | null;
@@ -40,6 +41,7 @@ function formatContact(contact: ContactFields): string {
   if (contact.role) lines.push(`Role: ${contact.role}`);
   if (contact.company) lines.push(`Company: ${contact.company}`);
   if (contact.source) lines.push(`How we met: ${contact.source}`);
+  if (contact.address) lines.push(`Address: ${contact.address}`);
   if (contact.personalDetails)
     lines.push(`Personal details: ${contact.personalDetails}`);
   if (contact.notes) lines.push(`Notes: ${contact.notes}`);
@@ -90,6 +92,7 @@ function describeChanges(before: ContactFields, after: ContactFields): string {
     { key: "role", label: "role" },
     { key: "email", label: "email" },
     { key: "phone", label: "phone" },
+    { key: "address", label: "address" },
     { key: "personalDetails", label: "personal details" },
     { key: "notes", label: "notes" },
     { key: "source", label: "source" },

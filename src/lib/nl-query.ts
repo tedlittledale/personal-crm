@@ -38,6 +38,7 @@ function formatContactLine(
   if (p.role) parts.push(`(${p.role})`);
   if (p.email) parts.push(p.email);
   if (p.phone) parts.push(p.phone);
+  if (p.address) parts.push(`Address: ${p.address}`);
   if (p.personalDetails) parts.push(p.personalDetails);
   if (p.notes) parts.push(`Notes: ${p.notes}`);
   if (p.source) parts.push(`Via: ${p.source}`);

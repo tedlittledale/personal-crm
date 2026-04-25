@@ -10,6 +10,7 @@ type PersonData = {
   role: string | null;
   email: string | null;
   phone: string | null;
+  address: string | null;
   personalDetails: string | null;
   notes: string | null;
   source: string | null;
@@ -54,6 +55,7 @@ export function PersonForm({
       role: formData.get("role") as string,
       email: formData.get("email") as string,
       phone: formData.get("phone") as string,
+      address: formData.get("address") as string,
       personalDetails: formData.get("personalDetails") as string,
       notes: formData.get("notes") as string,
       source: formData.get("source") as string,
@@ -204,6 +206,20 @@ export function PersonForm({
             className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
           />
         </div>
+      </div>
+
+      <div>
+        <label htmlFor="address" className="block text-sm font-medium mb-1">
+          Address
+        </label>
+        <textarea
+          id="address"
+          name="address"
+          rows={2}
+          defaultValue={initialData?.address ?? ""}
+          placeholder="Home, work, or city..."
+          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-y"
+        />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

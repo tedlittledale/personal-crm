@@ -43,6 +43,7 @@ export const people = pgTable(
     role: text("role"),
     email: text("email"),
     phone: text("phone"),
+    address: text("address"),
     personalDetails: text("personal_details"),
     notes: text("notes"),
     source: text("source"),
