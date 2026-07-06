@@ -1,9 +1,10 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db";
-import { people } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
-import { generateContactSummary, generateChangeDescription } from "@/lib/generate-summary";
+import {
+  getContactById,
+  updateContact,
+  deleteContact,
+} from "@/lib/contacts";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -16,11 +17,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
   const { id } = await params;
 
-  const [person] = await db
-    .select()
-    .from(people)
-    .where(and(eq(people.id, id), eq(people.userId, userId)));
-
+  const person = await getContactById(userId, id);
   if (!person) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -43,53 +40,26 @@ export async function PUT(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Name cannot be empty" }, { status: 400 });
   }
 
-  // Fetch full existing record (needed for ownership check + change description)
-  const [existing] = await db
-    .select()
-    .from(people)
-    .where(and(eq(people.id, id), eq(people.userId, userId)));
+  const result = await updateContact(userId, id, {
+    name,
+    company,
+    role,
+    email,
+    phone,
+    address,
+    personalDetails,
+    notes,
+    source,
+    birthdayMonth,
+    birthdayDay,
+    children,
+  });
 
-  if (!existing) {
+  if (!result) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const [updated] = await db
-    .update(people)
-    .set({
-      ...(name !== undefined && { name: name.trim() }),
-      ...(company !== undefined && { company: company?.trim() || null }),
-      ...(role !== undefined && { role: role?.trim() || null }),
-      ...(email !== undefined && { email: email?.trim() || null }),
-      ...(phone !== undefined && { phone: phone?.trim() || null }),
-      ...(address !== undefined && { address: address?.trim() || null }),
-      ...(personalDetails !== undefined && { personalDetails: personalDetails?.trim() || null }),
-      ...(notes !== undefined && { notes: notes?.trim() || null }),
-      ...(source !== undefined && { source: source?.trim() || null }),
-      ...(birthdayMonth !== undefined && { birthdayMonth: birthdayMonth ?? null }),
-      ...(birthdayDay !== undefined && { birthdayDay: birthdayDay ?? null }),
-      ...(children !== undefined && { children: children?.trim() || null }),
-      updatedAt: new Date(),
-    })
-    .where(eq(people.id, id))
-    .returning();
-
-  // Regenerate AI summary and change description in the background
-  Promise.all([
-    generateContactSummary(updated),
-    generateChangeDescription(existing, updated),
-  ])
-    .then(([aiSummary, lastChangeDescription]) =>
-      db
-        .update(people)
-        .set({
-          aiSummary,
-          ...(lastChangeDescription && { lastChangeDescription }),
-        })
-        .where(eq(people.id, id))
-    )
-    .catch((err) => console.error("Failed to generate summaries:", err));
-
-  return NextResponse.json(updated);
+  return NextResponse.json(result.updated);
 }
 
 // DELETE /api/people/[id] - Delete a person (must belong to user)
@@ -101,11 +71,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
 
   const { id } = await params;
 
-  const [deleted] = await db
-    .delete(people)
-    .where(and(eq(people.id, id), eq(people.userId, userId)))
-    .returning({ id: people.id });
-
+  const deleted = await deleteContact(userId, id);
   if (!deleted) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }

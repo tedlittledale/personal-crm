@@ -77,3 +77,47 @@ export const pendingReviews = pgTable(
   },
   (table) => [index("pending_reviews_user_id_idx").on(table.userId)]
 );
+
+// Reminders - user-created follow-up reminders delivered via Telegram
+export const reminders = pgTable(
+  "reminders",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    personId: uuid("person_id").references(() => people.id, {
+      onDelete: "set null",
+    }), // optional link to the contact the reminder is about
+    text: text("text").notNull(),
+    dueAt: timestamp("due_at").notNull(),
+    status: text("status").default("pending").notNull(), // 'pending' | 'sent'
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    sentAt: timestamp("sent_at"),
+  },
+  (table) => [
+    index("reminders_user_id_idx").on(table.userId),
+    index("reminders_status_due_at_idx").on(table.status, table.dueAt),
+  ]
+);
+
+// Pending actions - proposed write operations from the Telegram agent that
+// await user confirmation. Bridges the AI SDK approval pattern across the
+// stateless webhook: the agent proposes a write, and the next affirmative
+// message applies it. At most one active action per chat.
+export const pendingActions = pgTable(
+  "pending_actions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    chatId: text("chat_id").notNull(),
+    actionType: text("action_type").notNull(), // 'createContact' | 'updateContact' | 'createReminder'
+    payload: jsonb("payload").notNull(), // validated tool args to apply on confirmation
+    summary: text("summary").notNull(), // human-readable description shown to the user
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+  },
+  (table) => [index("pending_actions_chat_id_idx").on(table.chatId)]
+);
