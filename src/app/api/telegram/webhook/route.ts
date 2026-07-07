@@ -3,7 +3,37 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getMessagingProvider } from "@/lib/messaging";
-import { answerContactQuestion } from "@/lib/nl-query";
+import { runCrmAgent } from "@/lib/agent/crm-agent";
+import {
+  getActivePendingAction,
+  applyPendingAction,
+  clearPendingActionsForChat,
+} from "@/lib/agent/pending-actions";
+
+/** Classify a reply to a pending-action confirmation prompt. */
+function classifyConfirmation(text: string): "confirm" | "cancel" | "other" {
+  const normalized = text.trim().toLowerCase().replace(/[.!,]+$/, "");
+
+  // Multi-word phrases matched in full.
+  const confirmPhrases = ["do it", "go ahead", "please do", "yes please", "sounds good"];
+  const cancelPhrases = ["never mind", "forget it", "do not", "no thanks", "no thank you"];
+  if (confirmPhrases.includes(normalized)) return "confirm";
+  if (cancelPhrases.includes(normalized)) return "cancel";
+
+  // Otherwise decide on the first word, so "yes please" / "no thanks" also work
+  // without misreading "now update his email" as a cancel.
+  const first = normalized.split(/\s+/)[0] ?? "";
+  const confirm = new Set([
+    "yes", "y", "yeah", "yep", "yup", "ok", "okay", "k", "sure",
+    "confirm", "confirmed", "correct",
+  ]);
+  const cancel = new Set([
+    "no", "n", "nope", "cancel", "stop", "don't", "dont", "nevermind",
+  ]);
+  if (confirm.has(first)) return "confirm";
+  if (cancel.has(first)) return "cancel";
+  return "other";
+}
 
 /**
  * GET /api/telegram/webhook
@@ -107,13 +137,43 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      const answer = await answerContactQuestion(user.id, text);
-      await messaging.sendMessage(chatId, answer);
+      // If a proposed change is awaiting confirmation, a "yes"/"no" answers it.
+      const pending = await getActivePendingAction(chatId);
+      if (pending) {
+        const intent = classifyConfirmation(text);
+        if (intent === "confirm") {
+          const result = await applyPendingAction(
+            user.id,
+            pending.payload,
+            user.weeklySummaryTimezone
+          );
+          await clearPendingActionsForChat(chatId);
+          await messaging.sendMessage(chatId, result);
+          return NextResponse.json({ ok: true });
+        }
+        if (intent === "cancel") {
+          await clearPendingActionsForChat(chatId);
+          await messaging.sendMessage(
+            chatId,
+            "Okay, cancelled. Nothing was changed."
+          );
+          return NextResponse.json({ ok: true });
+        }
+        // Anything else is a new request: abandon the stale proposal so a later
+        // stray "yes" can't apply it. The agent may stage a fresh one below.
+        await clearPendingActionsForChat(chatId);
+      }
+
+      const reply = await runCrmAgent(
+        { userId: user.id, chatId, timezone: user.weeklySummaryTimezone },
+        text
+      );
+      await messaging.sendMessage(chatId, reply);
     } catch (err) {
-      console.error("Failed to answer contact question:", err);
+      console.error("Failed to handle Telegram message:", err);
       await messaging.sendMessage(
         chatId,
-        "Sorry, something went wrong while looking up your contacts. Please try again."
+        "Sorry, something went wrong. Please try again."
       );
     }
 
