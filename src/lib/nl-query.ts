@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@/db";
 import { people } from "@/db/schema";
-import { eq, desc, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 function getClient() {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -72,7 +72,7 @@ Rules:
 async function queryContactsFromFullContext(
   userId: string,
   question: string
-): Promise<{ answer: string; contactIds: string[] }> {
+): Promise<{ answer: string; contacts: (typeof people.$inferSelect)[] }> {
   const allContacts = await db
     .select()
     .from(people)
@@ -82,7 +82,7 @@ async function queryContactsFromFullContext(
   if (allContacts.length === 0) {
     return {
       answer: "You don't have any contacts yet.",
-      contactIds: [],
+      contacts: [],
     };
   }
 
@@ -114,13 +114,35 @@ async function queryContactsFromFullContext(
 
   try {
     const parsed = JSON.parse(cleaned);
+    const ids: unknown[] = Array.isArray(parsed.contactIds)
+      ? parsed.contactIds
+      : [];
+
+    // Resolve against the list we already loaded. The model is asked for
+    // UUIDs but sometimes returns the #index from the prompt instead, so
+    // accept either — an unresolvable id is dropped rather than sent to the
+    // database, where a non-UUID string would make the query throw.
+    const byId = new Map(allContacts.map((c) => [c.id, c]));
+    const contacts: (typeof people.$inferSelect)[] = [];
+    for (const raw of ids) {
+      const id = String(raw);
+      const byUuid = byId.get(id);
+      const index = /^\d+$/.test(id) ? Number(id) : NaN;
+      const match =
+        byUuid ??
+        (index >= 1 && index <= allContacts.length
+          ? allContacts[index - 1]
+          : undefined);
+      if (match && !contacts.includes(match)) contacts.push(match);
+    }
+
     return {
       answer: parsed.answer || "Sorry, I couldn't generate an answer.",
-      contactIds: Array.isArray(parsed.contactIds) ? parsed.contactIds : [],
+      contacts,
     };
   } catch {
     // If JSON parsing fails, treat the whole response as the answer
-    return { answer: cleaned, contactIds: [] };
+    return { answer: cleaned, contacts: [] };
   }
 }
 
@@ -135,20 +157,14 @@ export async function executeNaturalLanguageQuery(
   results: (typeof people.$inferSelect)[];
   summary: string;
 }> {
-  const { answer, contactIds } = await queryContactsFromFullContext(
+  const { answer, contacts } = await queryContactsFromFullContext(
     userId,
     query
   );
 
-  let results: (typeof people.$inferSelect)[] = [];
-
-  if (contactIds.length > 0) {
-    results = await db
-      .select()
-      .from(people)
-      .where(inArray(people.id, contactIds))
-      .orderBy(desc(people.updatedAt));
-  }
+  const results = [...contacts].sort(
+    (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()
+  );
 
   return { results, summary: answer };
 }

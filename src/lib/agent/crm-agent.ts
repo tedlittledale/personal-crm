@@ -81,12 +81,13 @@ What you can do:
 - Set a reminder to follow up (proposeCreateReminder).
 
 Rules:
+- If the message is just a name, word, or short phrase with no explicit request (e.g. "Tony Cowen", "bunny tales"), treat it as a search: call searchContacts with it immediately. The search matches against every field (name, company, role, notes, personal details, how you met, etc.), so pass the term as-is. Only ask what they meant if the search finds nothing relevant — and then offer to add it as a new contact.
 - To update a contact or attach a reminder to one, FIRST call searchContacts to find it and its contactId. Never invent a contactId.
 - If more than one contact matches, ask the user which one they mean before doing anything.
 - All changes (create/update/reminder) are PROPOSALS that require the user's confirmation. After calling a propose* tool, tell the user exactly what you're about to do and ask them to reply "yes" to confirm. Do NOT claim the change is done — it is not applied until they confirm.
 - Do one change at a time.
 - For reminders, convert the requested time into an absolute ISO 8601 datetime (dueAtISO). If no time of day is given, default to 09:00 in the user's timezone.
-- Keep replies short and friendly for a chat window. Use plain text, not tables.`;
+- Keep replies short and friendly for a chat window. Use plain text only — no tables and no markdown formatting like **bold** (messages are sent as plain text, so asterisks show up literally).`;
 }
 
 /**
@@ -253,8 +254,11 @@ export async function runCrmAgent(
     stopWhen: stepCountIs(5),
   });
 
+  // Replies go out via plain-text sendMessage, where markdown bold shows up
+  // as literal asterisks — the model uses it despite being told not to.
+  const reply = text.trim().replace(/\*\*/g, "");
+
   return (
-    text.trim() ||
-    "Sorry, I couldn't come up with a reply. Could you rephrase that?"
+    reply || "Sorry, I couldn't come up with a reply. Could you rephrase that?"
   );
 }
