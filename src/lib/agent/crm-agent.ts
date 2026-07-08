@@ -110,19 +110,27 @@ export async function runCrmAgent(
           .describe("What to look for, e.g. a name or 'people at Acme'"),
       }),
       execute: async ({ query }) => {
-        const { results, summary } = await executeNaturalLanguageQuery(
-          userId,
-          query
-        );
-        return {
-          summary,
-          contacts: results.slice(0, 10).map((p) => ({
-            contactId: p.id,
-            name: p.name,
-            company: p.company,
-            role: p.role,
-          })),
-        };
+        try {
+          const { results, summary } = await executeNaturalLanguageQuery(
+            userId,
+            query
+          );
+          return {
+            summary,
+            contacts: results.slice(0, 10).map((p) => ({
+              contactId: p.id,
+              name: p.name,
+              company: p.company,
+              role: p.role,
+            })),
+          };
+        } catch (err) {
+          // The AI SDK turns a thrown tool error into a tool-result the model
+          // reads, so it never reaches the webhook's catch — log it here or it
+          // is invisible in production.
+          console.error("searchContacts failed:", err);
+          return { error: "Failed to search contacts due to a technical error." };
+        }
       },
     }),
 
@@ -133,23 +141,28 @@ export async function runCrmAgent(
         contactId: z.string(),
       }),
       execute: async ({ contactId }) => {
-        const contact = await getContactById(userId, contactId);
-        if (!contact) return { error: "No contact with that id." };
-        return {
-          contactId: contact.id,
-          name: contact.name,
-          company: contact.company,
-          role: contact.role,
-          email: contact.email,
-          phone: contact.phone,
-          address: contact.address,
-          personalDetails: contact.personalDetails,
-          notes: contact.notes,
-          source: contact.source,
-          birthdayMonth: contact.birthdayMonth,
-          birthdayDay: contact.birthdayDay,
-          children: contact.children,
-        };
+        try {
+          const contact = await getContactById(userId, contactId);
+          if (!contact) return { error: "No contact with that id." };
+          return {
+            contactId: contact.id,
+            name: contact.name,
+            company: contact.company,
+            role: contact.role,
+            email: contact.email,
+            phone: contact.phone,
+            address: contact.address,
+            personalDetails: contact.personalDetails,
+            notes: contact.notes,
+            source: contact.source,
+            birthdayMonth: contact.birthdayMonth,
+            birthdayDay: contact.birthdayDay,
+            children: contact.children,
+          };
+        } catch (err) {
+          console.error("getContactDetails failed:", err);
+          return { error: "Failed to load contact due to a technical error." };
+        }
       },
     }),
 
