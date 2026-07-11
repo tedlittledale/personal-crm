@@ -33,10 +33,11 @@ export async function POST() {
   const { newContacts, updatedContacts, upcomingBirthdays } =
     await getWeeklySummaryData(userId);
 
-  const message =
-    newContacts.length === 0 && updatedContacts.length === 0 && upcomingBirthdays.length === 0
-      ? "📋 Weekly People Notes Summary\n\nNo new contacts, updates, or upcoming birthdays this week. You're all caught up!\n\n💬 Reply to this message to ask questions about your contacts."
-      : buildWeeklySummary(newContacts, upcomingBirthdays, updatedContacts);
+  const message = buildWeeklySummary(
+    newContacts,
+    upcomingBirthdays,
+    updatedContacts
+  );
 
   const messaging = getMessagingProvider();
   await messaging.sendMessage(user.telegramChatId, message);

@@ -108,6 +108,11 @@ export function buildWeeklySummary(
 
   sections.push("📋 Weekly People Notes Summary\n");
 
+  const hasContent =
+    newContacts.length > 0 ||
+    updatedContacts.length > 0 ||
+    upcomingBirthdays.length > 0;
+
   if (newContacts.length > 0) {
     sections.push(`🆕 New Contacts This Week (${newContacts.length}):`);
     for (const p of newContacts) {
@@ -141,6 +146,12 @@ export function buildWeeklySummary(
       sections.push(`  • ${p.name} — ${monthName} ${p.birthdayDay}`);
     }
     sections.push("");
+  }
+
+  if (!hasContent) {
+    sections.push(
+      "No new contacts, updates, or upcoming birthdays this week. You're all caught up!\n"
+    );
   }
 
   sections.push(

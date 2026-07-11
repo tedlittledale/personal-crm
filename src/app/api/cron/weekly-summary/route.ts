@@ -108,17 +108,8 @@ export async function GET(req: NextRequest) {
       const { newContacts, updatedContacts, upcomingBirthdays } =
         await getWeeklySummaryData(user.id, now);
 
-      // Skip if nothing to report
-      if (
-        newContacts.length === 0 &&
-        updatedContacts.length === 0 &&
-        upcomingBirthdays.length === 0
-      ) {
-        console.log(`[weekly-summary cron] User ${user.id}: skipped (no data to report)`);
-        skipped++;
-        continue;
-      }
-
+      // Always send on the user's scheduled slot — even a quiet week gets a
+      // "you're all caught up" note so the summary never silently goes missing.
       console.log(`[weekly-summary cron] User ${user.id}: sending summary (new=${newContacts.length}, updated=${updatedContacts.length}, birthdays=${upcomingBirthdays.length})`);
 
       // Build and send the message
