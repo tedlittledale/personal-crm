@@ -1,5 +1,5 @@
 import { anthropic } from "@ai-sdk/anthropic";
-import { generateText, tool, stepCountIs } from "ai";
+import { generateText, tool, stepCountIs, type ModelMessage } from "ai";
 import { z } from "zod";
 import { executeNaturalLanguageQuery } from "@/lib/nl-query";
 import { getContactById, type ContactInput } from "@/lib/contacts";
@@ -8,6 +8,10 @@ import {
   formatDueAt,
   type PendingActionPayload,
 } from "@/lib/agent/pending-actions";
+import {
+  loadConversationHistory,
+  appendConversationMessages,
+} from "@/lib/agent/conversation";
 
 // Keep the same cost-efficient model the Q&A flow already uses. Swap for
 // "claude-sonnet-4-20250514" if tool-calling reliability becomes an issue.
@@ -81,7 +85,9 @@ What you can do:
 - Set a reminder to follow up (proposeCreateReminder).
 
 Rules:
-- If the message is just a name, word, or short phrase with no explicit request (e.g. "Tony Cowen", "bunny tales"), treat it as a search: call searchContacts with it immediately. The search matches against every field (name, company, role, notes, personal details, how you met, etc.), so pass the term as-is. Only ask what they meant if the search finds nothing relevant — and then offer to add it as a new contact.
+- You see the recent conversation, not just the latest message. Read each message in that context. If you asked a question and the user replies with a short answer (a number, a name, "the first one", "yes the birthday"), it answers your question: act on it, do not treat it as a new request or ask again.
+- If the message is just a name, word, or short phrase with no explicit request (e.g. "Tony Cowen", "bunny tales") and it is not answering something you asked, treat it as a search: call searchContacts with it immediately. The search matches against every field (name, company, role, notes, personal details, how you met, etc.), so pass the term as-is. Only ask what they meant if the search finds nothing relevant — and then offer to add it as a new contact.
+- A proposal is applied only when a later message in the conversation shows a ✅ confirmation. If the user replied to a proposal with anything other than a confirmation, that proposal was dropped: if they want a changed version, call the propose tool again with the new details. Never assume an earlier proposal is still pending.
 - To update a contact or attach a reminder to one, FIRST call searchContacts to find it and its contactId. Never invent a contactId.
 - If more than one contact matches, ask the user which one they mean before doing anything.
 - All changes (create/update/reminder) are PROPOSALS that require the user's confirmation. After calling a propose* tool, tell the user exactly what you're about to do and ask them to reply "yes" to confirm. Do NOT claim the change is done — it is not applied until they confirm.
@@ -94,6 +100,10 @@ Rules:
  * Run the tool-calling CRM agent for one inbound Telegram message and return
  * the reply text to send back. Read tools act immediately; write tools stage a
  * pending action for the user to confirm on their next message.
+ *
+ * The recent conversation for the chat is loaded from the database and sent
+ * ahead of the new message, and this turn (user message, tool calls, tool
+ * results, reply) is appended afterwards, so follow-up replies are understood.
  */
 export async function runCrmAgent(
   ctx: AgentContext,
@@ -246,19 +256,34 @@ export async function runCrmAgent(
     }),
   };
 
-  const { text } = await generateText({
+  const history = await loadConversationHistory(chatId);
+  const userMessage: ModelMessage = { role: "user", content: message };
+
+  const { text, response } = await generateText({
     model: anthropic(AGENT_MODEL),
     system: buildSystemPrompt(ctx),
-    prompt: message,
+    messages: [...history, userMessage],
     tools,
     stopWhen: stepCountIs(5),
   });
 
   // Replies go out via plain-text sendMessage, where markdown bold shows up
   // as literal asterisks — the model uses it despite being told not to.
-  const reply = text.trim().replace(/\*\*/g, "");
+  const reply =
+    text.trim().replace(/\*\*/g, "") ||
+    "Sorry, I couldn't come up with a reply. Could you rephrase that?";
 
-  return (
-    reply || "Sorry, I couldn't come up with a reply. Could you rephrase that?"
-  );
+  // Persist this turn so the next webhook call sees it. response.messages
+  // holds the assistant and tool messages generated across all steps.
+  // History is best-effort: a failure here must not lose the reply.
+  try {
+    await appendConversationMessages(userId, chatId, [
+      userMessage,
+      ...response.messages,
+    ]);
+  } catch (err) {
+    console.error("Failed to save conversation history:", err);
+  }
+
+  return reply;
 }

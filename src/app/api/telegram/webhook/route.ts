@@ -9,6 +9,10 @@ import {
   applyPendingAction,
   clearPendingActionsForChat,
 } from "@/lib/agent/pending-actions";
+import {
+  appendConversationExchange,
+  clearConversation,
+} from "@/lib/agent/conversation";
 
 /** Classify a reply to a pending-action confirmation prompt. */
 function classifyConfirmation(text: string): "confirm" | "cancel" | "other" {
@@ -33,6 +37,23 @@ function classifyConfirmation(text: string): "confirm" | "cancel" | "other" {
   if (confirm.has(first)) return "confirm";
   if (cancel.has(first)) return "cancel";
   return "other";
+}
+
+/**
+ * Add a user/assistant exchange to the chat's conversation history. Best
+ * effort: the reply has already been sent, so a failure here is only logged.
+ */
+async function recordExchange(
+  userId: string,
+  chatId: string,
+  userText: string,
+  assistantText: string
+): Promise<void> {
+  try {
+    await appendConversationExchange(userId, chatId, userText, assistantText);
+  } catch (err) {
+    console.error("Failed to save conversation history:", err);
+  }
 }
 
 /**
@@ -137,6 +158,17 @@ export async function POST(req: NextRequest) {
     }
 
     try {
+      // /new (or /reset) forgets the recent conversation and any pending proposal.
+      if (/^\/(new|reset)(@\w+)?$/i.test(text.trim())) {
+        await clearPendingActionsForChat(chatId);
+        await clearConversation(chatId);
+        await messaging.sendMessage(
+          chatId,
+          "Okay, starting fresh. What would you like to do?"
+        );
+        return NextResponse.json({ ok: true });
+      }
+
       // If a proposed change is awaiting confirmation, a "yes"/"no" answers it.
       const pending = await getActivePendingAction(chatId);
       if (pending) {
@@ -149,14 +181,15 @@ export async function POST(req: NextRequest) {
           );
           await clearPendingActionsForChat(chatId);
           await messaging.sendMessage(chatId, result);
+          // Record the outcome so the agent knows the change was applied.
+          await recordExchange(user.id, chatId, text, result);
           return NextResponse.json({ ok: true });
         }
         if (intent === "cancel") {
+          const result = "Okay, cancelled. Nothing was changed.";
           await clearPendingActionsForChat(chatId);
-          await messaging.sendMessage(
-            chatId,
-            "Okay, cancelled. Nothing was changed."
-          );
+          await messaging.sendMessage(chatId, result);
+          await recordExchange(user.id, chatId, text, result);
           return NextResponse.json({ ok: true });
         }
         // Anything else is a new request: abandon the stale proposal so a later
