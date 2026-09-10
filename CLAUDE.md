@@ -41,7 +41,10 @@ Environment variables are stored in `.env.local` (used by both Next.js and drizz
 3. Filters applied against user's contacts, results returned
 
 ### Database Schema (`src/db/schema.ts`)
-Three tables: `users` (Clerk user ID + API key + Telegram link), `people` (contacts with personal/professional fields), `pendingReviews` (temporary voice transcript extractions)
+Tables: `users` (Clerk user ID + API key + Telegram link), `people` (contacts with personal/professional fields), `pendingReviews` (temporary voice transcript extractions), `reminders` (follow-up reminders sent via Telegram), `pendingActions` (agent-proposed writes awaiting a "yes"), `chatMessages` (recent Telegram conversation history replayed to the agent so follow-up replies keep context; pruned by age and count)
+
+### Telegram Agent (`src/lib/agent/`)
+`crm-agent.ts` runs a tool-calling agent per inbound message. It loads the chat's recent history from `chatMessages` (`conversation.ts`), sends it ahead of the new message, and appends the turn afterwards. Write tools stage a `pendingActions` row that the webhook applies on the next "yes". `/new` or `/reset` in Telegram clears both.
 
 ### API Authentication Patterns
 - **Most routes:** Clerk session via `auth()` from `@clerk/nextjs/server`

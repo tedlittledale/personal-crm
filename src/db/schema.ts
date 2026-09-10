@@ -7,6 +7,7 @@ import {
   index,
   integer,
   boolean,
+  serial,
 } from "drizzle-orm/pg-core";
 
 // Users table - synced from Clerk via webhook
@@ -120,4 +121,24 @@ export const pendingActions = pgTable(
     expiresAt: timestamp("expires_at").notNull(),
   },
   (table) => [index("pending_actions_chat_id_idx").on(table.chatId)]
+);
+
+// Chat messages - recent conversation history for the Telegram agent, so a
+// reply like "1" or "the second one" can be read against the question the
+// agent just asked. Each row is one AI SDK ModelMessage (user, assistant, or
+// tool). Rows are pruned by age and count; `seq` preserves order within a turn.
+export const chatMessages = pgTable(
+  "chat_messages",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    seq: serial("seq").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    chatId: text("chat_id").notNull(),
+    role: text("role").notNull(), // 'user' | 'assistant' | 'tool'
+    message: jsonb("message").notNull(), // the full ModelMessage
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("chat_messages_chat_id_seq_idx").on(table.chatId, table.seq)]
 );
