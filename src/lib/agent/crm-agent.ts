@@ -12,6 +12,20 @@ import {
   loadConversationHistory,
   appendConversationMessages,
 } from "@/lib/agent/conversation";
+import {
+  listGiftIdeas,
+  addGiftIdeas,
+  deleteGiftIdeas,
+  getGiftIdea,
+  type GiftPatch,
+} from "@/lib/gifts";
+import {
+  formatOccasion,
+  giftOccasion,
+  isLive,
+  localDate,
+  GIFT_STATUSES,
+} from "@/lib/gift-occasions";
 
 // Keep the same cost-efficient model the Q&A flow already uses. Swap for
 // "claude-sonnet-4-20250514" if tool-calling reliability becomes an issue.
@@ -31,6 +45,37 @@ const contactFieldSchema = {
   birthdayDay: z.number().int().min(1).max(31).nullish(),
   children: z.string().nullish(),
 };
+
+/** How long after adding gift ideas an "undo" can delete them without a confirmation. */
+const GIFT_UNDO_WINDOW_MS = 30 * 60 * 1000;
+
+/** Occasion fields shared by the gift tools. All optional: gaps are filled with the next upcoming date. */
+const giftOccasionSchema = {
+  occasionType: z
+    .enum(["birthday", "christmas", "other"])
+    .nullish()
+    .describe(
+      "Only if the user named an occasion. Leave empty to file under the person's next birthday or Christmas, whichever comes first."
+    ),
+  occasionYear: z
+    .number()
+    .int()
+    .nullish()
+    .describe("Only if the user named a year, e.g. 'Christmas next year'."),
+  occasionLabel: z
+    .string()
+    .nullish()
+    .describe("Name of an 'other' occasion, e.g. 'Anniversary'."),
+};
+
+const giftIdeaListSchema = z
+  .array(
+    z.object({
+      idea: z.string().min(1).describe("The gift, e.g. 'microscope'"),
+      notes: z.string().nullish().describe("Optional link, price, size..."),
+    })
+  )
+  .min(1);
 
 /** Build a human-readable summary of the fields being set on a contact. */
 function describeFields(fields: Record<string, unknown>): string {
@@ -83,6 +128,7 @@ What you can do:
 - Add a new contact (proposeCreateContact).
 - Update an existing contact (proposeUpdateContact).
 - Set a reminder to follow up (proposeCreateReminder).
+- Keep gift lists: save present ideas for a contact (addGiftIdeas), show them (listGiftIdeas), and mark them bought/given/dropped or move them (proposeUpdateGiftIdea).
 
 Rules:
 - You see the recent conversation, not just the latest message. Read each message in that context. If you asked a question and the user replies with a short answer (a number, a name, "the first one", "yes the birthday"), it answers your question: act on it, do not treat it as a new request or ask again.
@@ -91,8 +137,16 @@ Rules:
 - If searchContacts returns an error, tell the user the search failed and to try again. Never present a failed search as "no contacts found".
 - To update a contact or attach a reminder to one, FIRST call searchContacts to find it and its contactId. Never invent a contactId.
 - If more than one contact matches, ask the user which one they mean before doing anything.
-- All changes (create/update/reminder) are PROPOSALS that require the user's confirmation. After calling a propose* tool, tell the user exactly what you're about to do and ask them to reply "yes" to confirm. Do NOT claim the change is done — it is not applied until they confirm.
+- All changes (create/update/reminder), except saving and undoing gift ideas, are PROPOSALS that require the user's confirmation. After calling a propose* tool, tell the user exactly what you're about to do and ask them to reply "yes" to confirm. Do NOT claim the change is done — it is not applied until they confirm.
 - Do one change at a time.
+
+Gift ideas:
+- Messages like "present idea for Olly - microscope", "gift ideas Olly: lego, a book" or "Olly would love a microscope for Christmas" mean: find the contact with searchContacts, then call addGiftIdeas. Several ideas in one message go in one addGiftIdeas call.
+- Only set the occasion if the user named one ("for his birthday", "for Christmas next year"). Otherwise leave it empty and it is filed under the person's next birthday or Christmas.
+- addGiftIdeas saves immediately (no "yes" needed). Reply with what was saved and where, e.g. "Saved microscope to Olly's list (Christmas 2026). Reply 'undo' to remove." If the user then says "undo", call undoGiftIdeas with the giftIds from that save.
+- searchContacts also matches the children field, so a search for "Olly" can return Olly's parent. Only use a contact whose name is the person. If the only match is a parent whose children mention the name, or nothing matches, offer to add them as a new contact with proposeCreateContact, passing the gift ideas in giftIdeas and a note like "Child of Sam Smith" in notes. Say that the ideas will be saved once they confirm.
+- Marking gifts bought/given/dropped, moving them to another occasion or editing them needs confirmation via proposeUpdateGiftIdea. Call listGiftIdeas first to get the giftId.
+- When listing, the live list is ideas not yet acted on plus gifts bought for an upcoming occasion. Ideas filed under an occasion that has passed still show; mention which occasion they were filed under. Use includeHistory for questions about past years.
 - For reminders, convert the requested time into an absolute ISO 8601 datetime (dueAtISO). If no time of day is given, default to 09:00 in the user's timezone.
 - Keep replies short and friendly for a chat window. Use plain text only — no tables and no markdown formatting like **bold** (messages are sent as plain text, so asterisks show up literally).`;
 }
@@ -180,16 +234,41 @@ export async function runCrmAgent(
 
     proposeCreateContact: tool({
       description:
-        "Propose creating a new contact. Requires the user's confirmation before it is saved.",
+        "Propose creating a new contact. Requires the user's confirmation before it is saved. If the user was adding gift ideas for someone who isn't a contact yet, pass them as giftIdeas and they are saved to the new contact's list on confirmation.",
       inputSchema: z.object({
         name: z.string().min(1),
         ...contactFieldSchema,
+        giftIdeas: giftIdeaListSchema.nullish(),
+        ...giftOccasionSchema,
       }),
-      execute: async ({ name, ...fields }) => {
+      execute: async ({
+        name,
+        giftIdeas,
+        occasionType,
+        occasionYear,
+        occasionLabel,
+        ...fields
+      }) => {
         const input = { name, ...pickDefined(fields) } as ContactInput;
         const detail = describeFields(fields);
-        const summary = `Add a new contact: ${name}${detail ? ` (${detail})` : ""}`;
-        const action: PendingActionPayload = { type: "createContact", input };
+        const gifts = giftIdeas?.length
+          ? ` and save gift ideas: ${giftIdeas.map((g) => g.idea).join(", ")}`
+          : "";
+        const summary = `Add a new contact: ${name}${detail ? ` (${detail})` : ""}${gifts}`;
+        const action: PendingActionPayload = {
+          type: "createContact",
+          input,
+          ...(giftIdeas?.length && {
+            giftIdeas: {
+              ideas: giftIdeas,
+              occasion: {
+                type: occasionType,
+                year: occasionYear,
+                label: occasionLabel,
+              },
+            },
+          }),
+        };
         await proposePendingAction(userId, chatId, action, summary);
         return { staged: true, summary };
       },
@@ -251,6 +330,137 @@ export async function runCrmAgent(
           text,
           dueAtISO,
         };
+        await proposePendingAction(userId, chatId, action, summary);
+        return { staged: true, summary };
+      },
+    }),
+
+    listGiftIdeas: tool({
+      description:
+        "List gift ideas, for one contact or across everyone. By default returns the live list: ideas not yet acted on (whatever year they were filed under) and gifts bought for an upcoming occasion. Set includeHistory to also get given gifts and past occasions, e.g. 'what did I get Olly last Christmas?'.",
+      inputSchema: z.object({
+        contactId: z.string().nullish().describe("From searchContacts; omit for everyone"),
+        occasionType: z.enum(["birthday", "christmas", "other"]).nullish(),
+        year: z.number().int().nullish(),
+        includeHistory: z.boolean().nullish(),
+      }),
+      execute: async ({ contactId, occasionType, year, includeHistory }) => {
+        try {
+          const today = localDate(new Date(), timezone);
+          const gifts = await listGiftIdeas(userId, {
+            personId: contactId ?? undefined,
+            occasionType: occasionType ?? undefined,
+            year: year ?? undefined,
+          });
+          return {
+            gifts: gifts
+              .filter((g) => includeHistory || isLive(g, g, today))
+              .map((g) => ({
+                giftId: g.id,
+                person: g.personName,
+                idea: g.idea,
+                notes: g.notes,
+                occasion: formatOccasion(giftOccasion(g)),
+                status: g.status,
+              })),
+          };
+        } catch (err) {
+          console.error("listGiftIdeas failed:", err);
+          return { error: "Failed to load gift ideas due to a technical error." };
+        }
+      },
+    }),
+
+    addGiftIdeas: tool({
+      description:
+        "Save one or more gift ideas to an existing contact's gift list. Saved immediately, no confirmation needed. The contact must come from searchContacts.",
+      inputSchema: z.object({
+        contactId: z.string().describe("From searchContacts"),
+        ideas: giftIdeaListSchema,
+        ...giftOccasionSchema,
+      }),
+      execute: async ({ contactId, ideas, occasionType, occasionYear, occasionLabel }) => {
+        try {
+          const saved = await addGiftIdeas(
+            userId,
+            contactId,
+            ideas,
+            { type: occasionType, year: occasionYear, label: occasionLabel },
+            timezone
+          );
+          if (!saved) return { error: "No contact with that id." };
+          return {
+            saved: true,
+            person: saved.personName,
+            occasion: formatOccasion(saved.occasion),
+            giftIds: saved.gifts.map((g) => g.id),
+            ideas: saved.gifts.map((g) => g.idea),
+          };
+        } catch (err) {
+          console.error("addGiftIdeas failed:", err);
+          return { error: "Failed to save gift ideas due to a technical error." };
+        }
+      },
+    }),
+
+    undoGiftIdeas: tool({
+      description:
+        "Undo a recent addGiftIdeas call by deleting the gift ideas it just saved. Only works for ideas added in the last 30 minutes; for older ones use proposeUpdateGiftIdea with status 'dropped'.",
+      inputSchema: z.object({
+        giftIds: z.array(z.string()).min(1).describe("giftIds returned by addGiftIdeas"),
+      }),
+      execute: async ({ giftIds }) => {
+        try {
+          const deleted = await deleteGiftIdeas(userId, giftIds, {
+            createdAfter: new Date(Date.now() - GIFT_UNDO_WINDOW_MS),
+          });
+          return { deleted };
+        } catch (err) {
+          console.error("undoGiftIdeas failed:", err);
+          return { error: "Failed to undo due to a technical error." };
+        }
+      },
+    }),
+
+    proposeUpdateGiftIdea: tool({
+      description:
+        "Propose changing a gift idea: mark it bought, given or dropped, move it to another occasion, or edit it. Requires the user's confirmation. Get the giftId from listGiftIdeas.",
+      inputSchema: z.object({
+        giftId: z.string().describe("From listGiftIdeas"),
+        giftName: z.string().describe("The gift idea, for the confirmation message"),
+        personName: z.string().describe("Who it is for, for the confirmation message"),
+        status: z.enum(GIFT_STATUSES).nullish(),
+        occasionType: z.enum(["birthday", "christmas", "other"]).nullish(),
+        occasionYear: z.number().int().nullish(),
+        occasionLabel: z.string().nullish(),
+        idea: z.string().nullish().describe("New wording for the idea"),
+        notes: z.string().nullish(),
+      }),
+      execute: async ({ giftId, giftName, personName, ...fields }) => {
+        if (!(await getGiftIdea(userId, giftId))) {
+          return { error: "No gift idea with that id. Call listGiftIdeas to find it." };
+        }
+        const patch = pickDefined({
+          status: fields.status ?? undefined,
+          occasionType: fields.occasionType ?? undefined,
+          occasionYear: fields.occasionYear ?? undefined,
+          occasionLabel: fields.occasionLabel ?? undefined,
+          idea: fields.idea ?? undefined,
+          notes: fields.notes ?? undefined,
+        }) as GiftPatch;
+        const changes: string[] = [];
+        if (patch.status) changes.push(`mark as ${patch.status}`);
+        if (patch.occasionType || patch.occasionYear) {
+          changes.push(
+            `move to ${[patch.occasionLabel ?? patch.occasionType, patch.occasionYear]
+              .filter(Boolean)
+              .join(" ")}`
+          );
+        }
+        if (patch.idea) changes.push(`rename to "${patch.idea}"`);
+        if (patch.notes) changes.push(`set notes: ${patch.notes}`);
+        const summary = `Gift idea for ${personName}, "${giftName}": ${changes.join(", ") || "no changes"}`;
+        const action: PendingActionPayload = { type: "updateGiftIdea", giftId, patch };
         await proposePendingAction(userId, chatId, action, summary);
         return { staged: true, summary };
       },

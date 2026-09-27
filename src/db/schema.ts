@@ -114,7 +114,7 @@ export const pendingActions = pgTable(
       .notNull()
       .references(() => users.id),
     chatId: text("chat_id").notNull(),
-    actionType: text("action_type").notNull(), // 'createContact' | 'updateContact' | 'createReminder'
+    actionType: text("action_type").notNull(), // 'createContact' | 'updateContact' | 'createReminder' | 'updateGiftIdea'
     payload: jsonb("payload").notNull(), // validated tool args to apply on confirmation
     summary: text("summary").notNull(), // human-readable description shown to the user
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -141,4 +141,34 @@ export const chatMessages = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [index("chat_messages_chat_id_seq_idx").on(table.chatId, table.seq)]
+);
+
+// Gift ideas - present ideas for a contact, filed against an occasion
+// (their birthday, Christmas, or something else) and year. Unacted ideas stay
+// on the live list whatever year they were filed under; bought/given ones form
+// the per-occasion history.
+export const giftIdeas = pgTable(
+  "gift_ideas",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    personId: uuid("person_id")
+      .notNull()
+      .references(() => people.id, { onDelete: "cascade" }),
+    idea: text("idea").notNull(),
+    notes: text("notes"), // link, price, size...
+    occasionType: text("occasion_type").notNull(), // 'birthday' | 'christmas' | 'other'
+    occasionLabel: text("occasion_label"), // name of an 'other' occasion, e.g. "Anniversary"
+    occasionYear: integer("occasion_year").notNull(),
+    status: text("status").default("idea").notNull(), // 'idea' | 'bought' | 'given' | 'dropped'
+    statusChangedAt: timestamp("status_changed_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("gift_ideas_user_id_idx").on(table.userId),
+    index("gift_ideas_person_id_idx").on(table.personId),
+  ]
 );

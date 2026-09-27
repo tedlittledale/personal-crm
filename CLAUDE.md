@@ -41,10 +41,13 @@ Environment variables are stored in `.env.local` (used by both Next.js and drizz
 3. Filters applied against user's contacts, results returned
 
 ### Database Schema (`src/db/schema.ts`)
-Tables: `users` (Clerk user ID + API key + Telegram link), `people` (contacts with personal/professional fields), `pendingReviews` (temporary voice transcript extractions), `reminders` (follow-up reminders sent via Telegram), `pendingActions` (agent-proposed writes awaiting a "yes"), `chatMessages` (recent Telegram conversation history replayed to the agent so follow-up replies keep context; pruned by age and count)
+Tables: `users` (Clerk user ID + API key + Telegram link), `people` (contacts with personal/professional fields), `pendingReviews` (temporary voice transcript extractions), `reminders` (follow-up reminders sent via Telegram), `pendingActions` (agent-proposed writes awaiting a "yes"), `chatMessages` (recent Telegram conversation history replayed to the agent so follow-up replies keep context; pruned by age and count), `giftIdeas` (present ideas per contact, filed under an occasion type + year)
 
 ### Telegram Agent (`src/lib/agent/`)
 `crm-agent.ts` runs a tool-calling agent per inbound message. It loads the chat's recent history from `chatMessages` (`conversation.ts`), sends it ahead of the new message, and appends the turn afterwards. Write tools stage a `pendingActions` row that the webhook applies on the next "yes". `/new` or `/reset` in Telegram clears both.
+
+### Gift Ideas (`src/lib/gifts.ts`, `src/lib/gift-occasions.ts`)
+Each idea is filed under `birthday`, `christmas` or `other` plus a year; with no occasion given it goes to the contact's next birthday or Christmas, whichever is sooner. The live list is every `idea` (whatever year it was filed under) plus `bought` gifts whose occasion hasn't passed; `given` and past `bought` gifts form the per-occasion history. The Telegram agent saves ideas immediately (`addGiftIdeas`, with `undoGiftIdeas` for 30 minutes after) but status/occasion changes go through a pending action. Shown on the person page and at `/gifts`.
 
 ### API Authentication Patterns
 - **Most routes:** Clerk session via `auth()` from `@clerk/nextjs/server`
