@@ -114,7 +114,7 @@ export const pendingActions = pgTable(
       .notNull()
       .references(() => users.id),
     chatId: text("chat_id").notNull(),
-    actionType: text("action_type").notNull(), // 'createContact' | 'updateContact' | 'createReminder' | 'updateGiftIdea'
+    actionType: text("action_type").notNull(), // 'createContact' | 'updateContact' | 'createReminder' | 'updateGiftIdeas'
     payload: jsonb("payload").notNull(), // validated tool args to apply on confirmation
     summary: text("summary").notNull(), // human-readable description shown to the user
     createdAt: timestamp("created_at").defaultNow().notNull(),

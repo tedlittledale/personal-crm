@@ -492,6 +492,9 @@ export default function SettingsPage() {
             <h3 className="text-sm font-medium">Birthday Reminders</h3>
             <p className="text-xs text-muted-foreground">
               Receive a Telegram message at 9 AM on your contacts&rsquo; birthdays.
+              For people you&rsquo;ve saved gift ideas for, you&rsquo;ll also get a
+              nudge two weeks before their birthday, a Christmas roundup on 25
+              November, and a check-in afterwards asking which gifts you gave.
             </p>
 
             {birthdayRemindersLoading ? (

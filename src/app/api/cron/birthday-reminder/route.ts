@@ -3,6 +3,10 @@ import { db } from "@/db";
 import { users, people } from "@/db/schema";
 import { eq, and, isNotNull } from "drizzle-orm";
 import { getMessagingProvider } from "@/lib/messaging";
+import { listGiftIdeas } from "@/lib/gifts";
+import { localDate } from "@/lib/gift-occasions";
+import { buildGiftNudges } from "@/lib/gift-nudges";
+import { recordScheduledMessage } from "@/lib/agent/conversation";
 
 const MONTH_NAMES = [
   "",
@@ -50,7 +54,9 @@ function getUserLocalTime(
  * GET /api/cron/birthday-reminder
  * Runs every 30 minutes via Vercel cron. For each user with birthday reminders
  * enabled and a linked Telegram account, checks if it's 9:00 AM in their timezone
- * and sends reminders for contacts whose birthday is today.
+ * and sends reminders for contacts whose birthday is today, plus gift nudges
+ * (upcoming birthdays, the Christmas roundup, and "which did you give?"
+ * follow-ups; see src/lib/gift-nudges.ts).
  * Protected by CRON_SECRET via Authorization: Bearer header.
  */
 export async function GET(req: NextRequest) {
@@ -133,38 +139,52 @@ export async function GET(req: NextRequest) {
           )
         );
 
-      if (birthdayContacts.length === 0) {
-        console.log(`[birthday-reminder cron] User ${user.id}: skipped (no birthdays today)`);
+      const giftNudges = buildGiftNudges(
+        await listGiftIdeas(user.id),
+        localDate(now, user.weeklySummaryTimezone)
+      );
+
+      if (birthdayContacts.length === 0 && giftNudges.length === 0) {
+        console.log(`[birthday-reminder cron] User ${user.id}: skipped (no birthdays or gift nudges today)`);
         skipped++;
         continue;
       }
 
-      console.log(`[birthday-reminder cron] User ${user.id}: sending reminder for ${birthdayContacts.length} birthday(s)`);
+      console.log(`[birthday-reminder cron] User ${user.id}: sending ${birthdayContacts.length} birthday(s), ${giftNudges.length} gift nudge(s)`);
 
-      // Build and send the birthday reminder message
-      const lines: string[] = [];
-      lines.push(`🎂 Birthday Reminder\n`);
+      if (birthdayContacts.length > 0) {
+        // Build and send the birthday reminder message
+        const lines: string[] = [];
+        lines.push(`🎂 Birthday Reminder\n`);
 
-      if (birthdayContacts.length === 1) {
-        const p = birthdayContacts[0];
-        const details = [p.role, p.company].filter(Boolean).join(" at ");
-        lines.push(
-          `Today is ${p.name}'s birthday!${details ? ` (${details})` : ""}`
-        );
-      } else {
-        lines.push(
-          `${birthdayContacts.length} of your contacts have birthdays today!\n`
-        );
-        for (const p of birthdayContacts) {
+        if (birthdayContacts.length === 1) {
+          const p = birthdayContacts[0];
           const details = [p.role, p.company].filter(Boolean).join(" at ");
-          lines.push(`  • ${p.name}${details ? ` (${details})` : ""}`);
+          lines.push(
+            `Today is ${p.name}'s birthday!${details ? ` (${details})` : ""}`
+          );
+        } else {
+          lines.push(
+            `${birthdayContacts.length} of your contacts have birthdays today!\n`
+          );
+          for (const p of birthdayContacts) {
+            const details = [p.role, p.company].filter(Boolean).join(" at ");
+            lines.push(`  • ${p.name}${details ? ` (${details})` : ""}`);
+          }
         }
+
+        const monthName = MONTH_NAMES[month];
+        lines.push(`\n📅 ${monthName} ${day}`);
+
+        await messaging.sendMessage(user.telegramChatId, lines.join("\n"));
       }
 
-      const monthName = MONTH_NAMES[month];
-      lines.push(`\n📅 ${monthName} ${day}`);
-
-      await messaging.sendMessage(user.telegramChatId, lines.join("\n"));
+      // Gift nudges go into the chat history too, so a reply like "gave him
+      // the microscope" is read in context.
+      for (const nudge of giftNudges) {
+        await messaging.sendMessage(user.telegramChatId, nudge);
+        await recordScheduledMessage(user.id, user.telegramChatId, nudge);
+      }
 
       // Update lastBirthdayReminderAt
       await db

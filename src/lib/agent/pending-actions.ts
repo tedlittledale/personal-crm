@@ -46,8 +46,8 @@ export type PendingActionPayload =
       dueAtISO: string;
     }
   | {
-      type: "updateGiftIdea";
-      giftId: string;
+      type: "updateGiftIdeas";
+      giftIds: string[];
       patch: GiftPatch;
     };
 
@@ -154,14 +154,22 @@ export async function applyPendingAction(
       });
       return `✅ Reminder set for ${formatDueAt(dueAt, timezone)}.`;
     }
-    case "updateGiftIdea": {
-      const gift = await updateGiftIdea(userId, payload.giftId, payload.patch);
-      if (!gift) {
-        return "That gift idea no longer exists, so nothing was changed.";
+    case "updateGiftIdeas": {
+      const updated = [];
+      for (const giftId of payload.giftIds) {
+        const gift = await updateGiftIdea(userId, giftId, payload.patch);
+        if (gift) updated.push(gift);
       }
-      return `✅ Updated gift idea: ${gift.idea} (${gift.status}, ${formatOccasion(
-        giftOccasion(gift)
-      )}).`;
+      if (updated.length === 0) {
+        return "Those gift ideas no longer exist, so nothing was changed.";
+      }
+      const lines = updated.map(
+        (g) => `${g.idea} (${g.status}, ${formatOccasion(giftOccasion(g))})`
+      );
+      const missing = payload.giftIds.length - updated.length;
+      return `✅ Updated gift ideas: ${lines.join("; ")}.${
+        missing ? ` ${missing} no longer existed.` : ""
+      }`;
     }
   }
 }
