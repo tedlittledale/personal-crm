@@ -77,6 +77,29 @@ export async function appendConversationExchange(
   ]);
 }
 
+/**
+ * Stands in for the user's turn ahead of a message the app sent on its own
+ * (e.g. a gift nudge). History must start with a user turn, and the agent is
+ * told what this marker means.
+ */
+export const SCHEDULED_MESSAGE_MARKER = "[Automatic message: scheduled check-in]";
+
+/**
+ * Record a message the app sent unprompted so the agent sees it as context
+ * for the user's reply. Best effort: the message has already been sent.
+ */
+export async function recordScheduledMessage(
+  userId: string,
+  chatId: string,
+  text: string
+): Promise<void> {
+  try {
+    await appendConversationExchange(userId, chatId, SCHEDULED_MESSAGE_MARKER, text);
+  } catch (err) {
+    console.error("Failed to save scheduled message to conversation history:", err);
+  }
+}
+
 /** Forget the conversation so the next message starts fresh. */
 export async function clearConversation(chatId: string): Promise<void> {
   await db.delete(chatMessages).where(eq(chatMessages.chatId, chatId));

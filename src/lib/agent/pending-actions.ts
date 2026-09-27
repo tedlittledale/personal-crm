@@ -7,6 +7,13 @@ import {
   type ContactInput,
 } from "@/lib/contacts";
 import { createReminder } from "@/lib/reminders";
+import {
+  addGiftIdeas,
+  updateGiftIdea,
+  type GiftPatch,
+  type RequestedOccasion,
+} from "@/lib/gifts";
+import { formatOccasion, giftOccasion } from "@/lib/gift-occasions";
 
 const PENDING_ACTION_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
@@ -15,7 +22,16 @@ const PENDING_ACTION_TTL_MS = 30 * 60 * 1000; // 30 minutes
  * webhook requests so the next affirmative message can execute it.
  */
 export type PendingActionPayload =
-  | { type: "createContact"; input: ContactInput }
+  | {
+      type: "createContact";
+      input: ContactInput;
+      // Gift ideas to save for the new contact once it exists, so "ideas for
+      // Olly" works in one confirmation when Olly isn't a contact yet.
+      giftIdeas?: {
+        ideas: { idea: string; notes?: string | null }[];
+        occasion: RequestedOccasion;
+      };
+    }
   | {
       type: "updateContact";
       contactId: string;
@@ -28,6 +44,11 @@ export type PendingActionPayload =
       personName: string | null;
       text: string;
       dueAtISO: string;
+    }
+  | {
+      type: "updateGiftIdeas";
+      giftIds: string[];
+      patch: GiftPatch;
     };
 
 /**
@@ -95,7 +116,22 @@ export async function applyPendingAction(
   switch (payload.type) {
     case "createContact": {
       const person = await createContact(userId, payload.input);
-      return `✅ Added ${person.name} to your contacts.`;
+      if (!payload.giftIdeas?.ideas.length) {
+        return `✅ Added ${person.name} to your contacts.`;
+      }
+      const saved = await addGiftIdeas(
+        userId,
+        person.id,
+        payload.giftIdeas.ideas,
+        payload.giftIdeas.occasion,
+        timezone
+      );
+      if (!saved || saved.gifts.length === 0) {
+        return `✅ Added ${person.name} to your contacts.`;
+      }
+      return `✅ Added ${person.name} to your contacts and saved ${saved.gifts
+        .map((g) => g.idea)
+        .join(", ")} to their gift list (${formatOccasion(saved.occasion)}).`;
     }
     case "updateContact": {
       const result = await updateContact(userId, payload.contactId, payload.patch, {
@@ -117,6 +153,23 @@ export async function applyPendingAction(
         dueAt,
       });
       return `✅ Reminder set for ${formatDueAt(dueAt, timezone)}.`;
+    }
+    case "updateGiftIdeas": {
+      const updated = [];
+      for (const giftId of payload.giftIds) {
+        const gift = await updateGiftIdea(userId, giftId, payload.patch);
+        if (gift) updated.push(gift);
+      }
+      if (updated.length === 0) {
+        return "Those gift ideas no longer exist, so nothing was changed.";
+      }
+      const lines = updated.map(
+        (g) => `${g.idea} (${g.status}, ${formatOccasion(giftOccasion(g))})`
+      );
+      const missing = payload.giftIds.length - updated.length;
+      return `✅ Updated gift ideas: ${lines.join("; ")}.${
+        missing ? ` ${missing} no longer existed.` : ""
+      }`;
     }
   }
 }

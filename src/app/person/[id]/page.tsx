@@ -5,6 +5,9 @@ import { eq, and } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { PersonForm } from "@/components/person-form";
 import Link from "next/link";
+import { GiftIdeas } from "@/components/gift-ideas";
+import { getUserTimezone, listGiftIdeas } from "@/lib/gifts";
+import { localDate } from "@/lib/gift-occasions";
 
 export default async function PersonPage({
   params,
@@ -25,6 +28,11 @@ export default async function PersonPage({
     notFound();
   }
 
+  const [gifts, timezone] = await Promise.all([
+    listGiftIdeas(userId, { personId: person.id }),
+    getUserTimezone(userId),
+  ]);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -36,6 +44,15 @@ export default async function PersonPage({
       </div>
       <h1 className="text-lg font-semibold">Edit person</h1>
       <PersonForm initialData={person} mode="edit" />
+      <GiftIdeas
+        person={{
+          id: person.id,
+          birthdayMonth: person.birthdayMonth,
+          birthdayDay: person.birthdayDay,
+        }}
+        gifts={gifts}
+        today={localDate(new Date(), timezone)}
+      />
     </div>
   );
 }
