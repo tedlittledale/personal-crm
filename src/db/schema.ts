@@ -10,6 +10,12 @@ import {
   serial,
 } from "drizzle-orm/pg-core";
 
+// Every table enables Row-Level Security with no policies. The app talks to
+// Postgres directly as the Supabase `postgres` role, which bypasses RLS, so
+// this changes nothing for the app; it closes off the anon/authenticated roles
+// that Supabase's auto-generated REST API (PostgREST) uses, which otherwise
+// could read and write every table with just the project URL and anon key.
+
 // Users table - synced from Clerk via webhook
 export const users = pgTable("users", {
   id: text("id").primaryKey(), // Clerk user ID
@@ -29,7 +35,7 @@ export const users = pgTable("users", {
     .notNull(),
   lastBirthdayReminderAt: timestamp("last_birthday_reminder_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}).enableRLS();
 
 // People - the core entity, one per person you've met
 export const people = pgTable(
@@ -60,7 +66,7 @@ export const people = pgTable(
     index("people_user_id_idx").on(table.userId),
     index("people_name_idx").on(table.name),
   ]
-);
+).enableRLS();
 
 // Pending reviews - temporary holding area for voice note transcripts
 // before the user confirms and saves as a Person record
@@ -77,7 +83,7 @@ export const pendingReviews = pgTable(
     expiresAt: timestamp("expires_at").notNull(),
   },
   (table) => [index("pending_reviews_user_id_idx").on(table.userId)]
-);
+).enableRLS();
 
 // Reminders - user-created follow-up reminders delivered via Telegram
 export const reminders = pgTable(
@@ -100,7 +106,7 @@ export const reminders = pgTable(
     index("reminders_user_id_idx").on(table.userId),
     index("reminders_status_due_at_idx").on(table.status, table.dueAt),
   ]
-);
+).enableRLS();
 
 // Pending actions - proposed write operations from the Telegram agent that
 // await user confirmation. Bridges the AI SDK approval pattern across the
@@ -121,7 +127,7 @@ export const pendingActions = pgTable(
     expiresAt: timestamp("expires_at").notNull(),
   },
   (table) => [index("pending_actions_chat_id_idx").on(table.chatId)]
-);
+).enableRLS();
 
 // Chat messages - recent conversation history for the Telegram agent, so a
 // reply like "1" or "the second one" can be read against the question the
@@ -141,7 +147,7 @@ export const chatMessages = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [index("chat_messages_chat_id_seq_idx").on(table.chatId, table.seq)]
-);
+).enableRLS();
 
 // Gift ideas - present ideas for a contact, filed against an occasion
 // (their birthday, Christmas, or something else) and year. Unacted ideas stay
@@ -171,4 +177,4 @@ export const giftIdeas = pgTable(
     index("gift_ideas_user_id_idx").on(table.userId),
     index("gift_ideas_person_id_idx").on(table.personId),
   ]
-);
+).enableRLS();
