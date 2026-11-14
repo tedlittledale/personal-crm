@@ -15,7 +15,7 @@ export type Birthday = {
 };
 
 /** A calendar date with no time or timezone attached. */
-type LocalDate = { year: number; month: number; day: number };
+export type LocalDate = { year: number; month: number; day: number };
 
 /** Today's date in the given IANA timezone. */
 export function localDate(now: Date, timezone: string): LocalDate {

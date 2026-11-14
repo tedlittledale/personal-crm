@@ -1,136 +1,175 @@
 import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
-import { getUserTimezone, listGiftIdeas, type GiftIdeaWithPerson } from "@/lib/gifts";
+import { getUserTimezone, listGiftIdeas } from "@/lib/gifts";
+import { localDate, type LocalDate } from "@/lib/gift-occasions";
 import {
-  isLive,
-  localDate,
-  nextOccasionYear,
-} from "@/lib/gift-occasions";
+  giftHistoryGroups,
+  upcomingGiftGroups,
+  type OccasionGroup,
+  type ScheduleGift,
+  type UpcomingGift,
+} from "@/lib/gift-schedule";
 
 const MONTHS = [
   "", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ];
 
-/** Group gifts by contact, keeping the first-seen order. */
-function byPerson(gifts: GiftIdeaWithPerson[]) {
-  const groups = new Map<string, GiftIdeaWithPerson[]>();
-  for (const gift of gifts) {
-    groups.set(gift.personId, [...(groups.get(gift.personId) ?? []), gift]);
+function formatWhen(date: LocalDate | null, daysAway: number | null, type: string): string {
+  if (!date || daysAway == null) {
+    return type === "birthday" ? "Birthday not set" : "Date not set";
   }
-  return [...groups.values()];
+  const day = `${date.day} ${MONTHS[date.month]}`;
+  if (daysAway === 1) return `${day} · tomorrow`;
+  if (daysAway < 14) return `${day} · in ${daysAway} days`;
+  if (daysAway < 60) return `${day} · in ${Math.round(daysAway / 7)} weeks`;
+  return `${day} ${date.year} · in ${Math.round(daysAway / 30.44)} months`;
 }
 
-function PersonGifts({ gifts, suffix }: { gifts: GiftIdeaWithPerson[]; suffix?: string }) {
-  const person = gifts[0];
+function Notes({ notes }: { notes: string }) {
+  if (/^https?:\/\/\S+$/.test(notes.trim())) {
+    return (
+      <a
+        href={notes.trim()}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block truncate text-xs text-muted-foreground underline hover:text-foreground"
+      >
+        {notes.trim()}
+      </a>
+    );
+  }
+  return <p className="text-xs text-muted-foreground">{notes}</p>;
+}
+
+function GiftRow({ gift, muted }: { gift: ScheduleGift & { carriedOverFrom?: number | null }; muted?: boolean }) {
   return (
-    <li className="rounded-lg border border-border px-3 py-2">
-      <div className="flex items-baseline justify-between gap-2">
-        <Link href={`/person/${person.personId}`} className="text-sm font-medium hover:underline">
-          {person.personName}
-        </Link>
-        {suffix && <span className="text-xs text-muted-foreground">{suffix}</span>}
+    <li className="text-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={muted ? "text-muted-foreground" : ""}>{gift.idea}</span>
+        {gift.status !== "idea" && (
+          <span className="rounded bg-muted px-1.5 py-0.5 text-xs">{gift.status}</span>
+        )}
+        {gift.carriedOverFrom != null && (
+          <span className="text-xs text-muted-foreground">from {gift.carriedOverFrom}</span>
+        )}
       </div>
-      <ul className="mt-1 space-y-0.5">
-        {gifts.map((g) => (
-          <li key={g.id} className="text-sm flex items-center gap-2">
-            <span className={g.status === "given" ? "text-muted-foreground" : ""}>{g.idea}</span>
-            {g.status !== "idea" && (
-              <span className="rounded bg-muted px-1.5 py-0.5 text-xs">{g.status}</span>
-            )}
-          </li>
-        ))}
-      </ul>
+      {gift.notes && <Notes notes={gift.notes} />}
     </li>
   );
 }
 
-export default async function GiftsPage({
-  searchParams,
+function OccasionCard<G extends ScheduleGift>({
+  group,
+  subtitle,
+  muted,
 }: {
-  searchParams: Promise<{ year?: string }>;
+  group: OccasionGroup<G>;
+  subtitle?: string;
+  muted?: boolean;
 }) {
+  // A birthday is one person's occasion, so link the title to them instead of
+  // repeating their name above the list.
+  const single = group.type === "birthday" ? group.people[0] : null;
+  return (
+    <li className="rounded-lg border border-border px-3 py-2">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-2">
+        {single ? (
+          <Link href={`/person/${single.personId}`} className="text-sm font-medium hover:underline">
+            {group.title}
+          </Link>
+        ) : (
+          <h3 className="text-sm font-medium">{group.title}</h3>
+        )}
+        {subtitle && <span className="text-xs text-muted-foreground">{subtitle}</span>}
+      </div>
+      {single ? (
+        <ul className="mt-1 space-y-1">
+          {single.gifts.map((g) => (
+            <GiftRow key={g.id} gift={g} muted={muted} />
+          ))}
+        </ul>
+      ) : (
+        <ul className="mt-2 space-y-2">
+          {group.people.map((p) => (
+            <li key={p.personId}>
+              <Link
+                href={`/person/${p.personId}`}
+                className="text-xs font-medium text-muted-foreground hover:text-foreground hover:underline"
+              >
+                {p.personName}
+              </Link>
+              <ul className="space-y-1">
+                {p.gifts.map((g) => (
+                  <GiftRow key={g.id} gift={g} muted={muted} />
+                ))}
+              </ul>
+            </li>
+          ))}
+        </ul>
+      )}
+    </li>
+  );
+}
+
+export default async function GiftsPage() {
   const { userId } = await auth();
   if (!userId) return null;
 
-  const timezone = await getUserTimezone(userId);
+  const [timezone, all] = await Promise.all([getUserTimezone(userId), listGiftIdeas(userId)]);
   const today = localDate(new Date(), timezone);
-  const upcomingChristmas = nextOccasionYear(
-    "christmas",
-    { birthdayMonth: null, birthdayDay: null },
-    today
-  );
-  const { year: yearParam } = await searchParams;
-  const parsedYear = parseInt(yearParam ?? "", 10);
-  const year = Number.isNaN(parsedYear) ? upcomingChristmas : parsedYear;
 
-  const all = await listGiftIdeas(userId);
-  const christmas = all.filter(
-    (g) => g.occasionType === "christmas" && g.occasionYear === year
+  const upcoming = upcomingGiftGroups(all, today);
+  const history = giftHistoryGroups(all, today);
+  const ideaCount = upcoming.reduce(
+    (n, g) => n + g.people.reduce((m, p) => m + p.gifts.length, 0),
+    0
   );
-
-  // Live birthday ideas, soonest birthday first.
-  const birthdays = byPerson(
-    all.filter((g) => g.occasionType === "birthday" && isLive(g, g, today))
-  );
-  const daysUntil = (g: GiftIdeaWithPerson) => {
-    if (g.birthdayMonth == null || g.birthdayDay == null) return Infinity;
-    const start = Date.UTC(today.year, today.month - 1, today.day);
-    let next = Date.UTC(today.year, g.birthdayMonth - 1, g.birthdayDay);
-    if (next <= start) next = Date.UTC(today.year + 1, g.birthdayMonth - 1, g.birthdayDay);
-    return (next - start) / 86_400_000;
-  };
-  birthdays.sort((a, b) => daysUntil(a[0]) - daysUntil(b[0]));
 
   return (
     <div className="space-y-6">
-      <h1 className="text-lg font-semibold">Gifts</h1>
+      <div>
+        <h1 className="text-lg font-semibold">Gifts</h1>
+        {ideaCount > 0 && (
+          <p className="text-sm text-muted-foreground">
+            {ideaCount} {ideaCount === 1 ? "idea" : "ideas"} across {upcoming.length}{" "}
+            {upcoming.length === 1 ? "occasion" : "occasions"}
+          </p>
+        )}
+      </div>
 
       <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold">Christmas {year}</h2>
-          <div className="flex gap-2 text-sm">
-            <Link href={`/gifts?year=${year - 1}`} className="text-muted-foreground hover:text-foreground">
-              ← {year - 1}
-            </Link>
-            {year !== upcomingChristmas && (
-              <Link href="/gifts" className="text-muted-foreground hover:text-foreground">
-                This Christmas
-              </Link>
-            )}
-            <Link href={`/gifts?year=${year + 1}`} className="text-muted-foreground hover:text-foreground">
-              {year + 1} →
-            </Link>
-          </div>
-        </div>
-        {christmas.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No gift ideas for Christmas {year}.</p>
+        <h2 className="text-base font-semibold">Coming up</h2>
+        {upcoming.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No gift ideas yet. Add them from a contact&apos;s page or by messaging the Telegram bot.
+          </p>
         ) : (
           <ul className="space-y-2">
-            {byPerson(christmas).map((gifts) => (
-              <PersonGifts key={gifts[0].personId} gifts={gifts} />
+            {upcoming.map((group) => (
+              <OccasionCard<UpcomingGift<ScheduleGift>>
+                key={group.key}
+                group={group}
+                subtitle={formatWhen(group.date, group.daysAway, group.type)}
+              />
             ))}
           </ul>
         )}
       </section>
 
-      <section className="space-y-3">
-        <h2 className="text-base font-semibold">Birthdays</h2>
-        {birthdays.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No birthday gift ideas.</p>
-        ) : (
-          <ul className="space-y-2">
-            {birthdays.map((gifts) => {
-              const p = gifts[0];
-              const when =
-                p.birthdayMonth != null && p.birthdayDay != null
-                  ? `${p.birthdayDay} ${MONTHS[p.birthdayMonth]}`
-                  : "birthday not set";
-              return <PersonGifts key={p.personId} gifts={gifts} suffix={when} />;
-            })}
+      {history.length > 0 && (
+        <details className="group space-y-3">
+          <summary className="cursor-pointer text-base font-semibold list-none">
+            <span className="group-open:hidden">▸</span>
+            <span className="hidden group-open:inline">▾</span> Past gifts
+          </summary>
+          <ul className="mt-3 space-y-2">
+            {history.map((group) => (
+              <OccasionCard key={group.key} group={group} muted />
+            ))}
           </ul>
-        )}
-      </section>
+        </details>
+      )}
     </div>
   );
 }
