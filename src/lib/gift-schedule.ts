@@ -190,3 +190,40 @@ export function giftHistoryGroups<G extends ScheduleGift>(
     );
   });
 }
+
+const SHORT_MONTHS = [
+  "", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+function giftLine(gift: ScheduleGift): string {
+  let line = `- ${gift.idea}`;
+  if (gift.status !== "idea") line += ` (${gift.status})`;
+  if (gift.notes?.trim()) line += ` - ${gift.notes.trim().replace(/\s*\n\s*/g, " ")}`;
+  return line;
+}
+
+/**
+ * An occasion's gift list as plain text for pasting into a message or note:
+ * a heading, then the ideas, under each person's name when there are
+ * several people.
+ */
+export function occasionGroupText<G extends ScheduleGift>(group: OccasionGroup<G>): string {
+  const heading = group.date
+    ? `${group.title} (${group.date.day} ${SHORT_MONTHS[group.date.month]})`
+    : group.title;
+  const lines = [heading];
+  if (group.type === "birthday") {
+    lines.push(...group.people.flatMap((p) => p.gifts.map(giftLine)));
+  } else {
+    for (const p of group.people) {
+      lines.push(p.personName, ...p.gifts.map(giftLine));
+    }
+  }
+  return lines.join("\n");
+}
+
+/** Several occasions' lists as one block of text, separated by blank lines. */
+export function occasionGroupsText<G extends ScheduleGift>(groups: OccasionGroup<G>[]): string {
+  return groups.map(occasionGroupText).join("\n\n");
+}
