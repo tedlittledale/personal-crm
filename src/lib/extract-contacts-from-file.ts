@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { CLAUDE_MODEL, replyText } from "@/lib/claude";
 import { z } from "zod";
 import { ExtractedPerson } from "./extract";
 
@@ -103,7 +104,7 @@ export async function extractContactsFromFile(
   const anthropic = getClient();
 
   const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: CLAUDE_MODEL,
     max_tokens: 8192,
     system: EXTRACT_CONTACTS_PROMPT,
     messages: [
@@ -115,7 +116,7 @@ export async function extractContactsFromFile(
   });
 
   const text =
-    message.content[0].type === "text" ? message.content[0].text : "[]";
+    replyText(message, "[]");
 
   // Parse the JSON response, stripping any markdown fences
   const cleaned = text

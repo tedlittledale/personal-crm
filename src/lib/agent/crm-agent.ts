@@ -1,3 +1,4 @@
+import { CLAUDE_MODEL } from "@/lib/claude";
 import { anthropic } from "@ai-sdk/anthropic";
 import { generateText, tool, stepCountIs, type ModelMessage } from "ai";
 import { z } from "zod";
@@ -28,9 +29,10 @@ import {
   GIFT_STATUSES,
 } from "@/lib/gift-occasions";
 
-// Keep the same cost-efficient model the Q&A flow already uses. Swap for
-// "claude-sonnet-4-20250514" if tool-calling reliability becomes an issue.
-const AGENT_MODEL = "claude-haiku-4-5-20251001";
+// Haiku 4.5 sometimes replied "Saved … to Maya's list" without calling
+// addGiftIdeas, so nothing was saved (found filming the demo, 26 Nov 2026).
+// Sonnet calls its tools reliably.
+const AGENT_MODEL = CLAUDE_MODEL;
 
 /** Editable contact fields shared by the create/update tools. */
 const contactFieldSchema = {
