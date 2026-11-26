@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { CLAUDE_MODEL, replyText } from "@/lib/claude";
 
 function getClient() {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -58,7 +59,7 @@ If a field isn't mentioned in the transcript, set it to null. Write in clear, co
 async function tidyTranscript(transcript: string): Promise<string> {
   const anthropic = getClient();
   const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: CLAUDE_MODEL,
     max_tokens: 2048,
     system: TIDY_PROMPT,
     messages: [
@@ -70,7 +71,7 @@ async function tidyTranscript(transcript: string): Promise<string> {
   });
 
   const text =
-    message.content[0].type === "text" ? message.content[0].text : transcript;
+    replyText(message, transcript);
 
   return text.trim();
 }
@@ -85,7 +86,7 @@ export async function extractPersonFromTranscript(
 
   // Step 2: Extract structured data from the cleaned transcript
   const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: CLAUDE_MODEL,
     max_tokens: 1024,
     system: EXTRACT_PROMPT,
     messages: [
@@ -97,7 +98,7 @@ export async function extractPersonFromTranscript(
   });
 
   const text =
-    message.content[0].type === "text" ? message.content[0].text : "";
+    replyText(message);
 
   // Parse the JSON response, stripping any markdown fences
   const cleaned = text.replace(/```json?\n?/g, "").replace(/```\n?/g, "").trim();

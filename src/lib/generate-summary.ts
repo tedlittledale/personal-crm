@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { CLAUDE_MODEL, replyText } from "@/lib/claude";
 
 function getClient() {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -57,8 +58,8 @@ export async function generateContactSummary(
   const anthropic = getClient();
 
   const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 256,
+    model: CLAUDE_MODEL,
+    max_tokens: 2048,
     system: SUMMARY_PROMPT,
     messages: [
       {
@@ -69,7 +70,7 @@ export async function generateContactSummary(
   });
 
   const text =
-    message.content[0].type === "text" ? message.content[0].text : "";
+    replyText(message);
   return text.trim();
 }
 
@@ -121,8 +122,8 @@ export async function generateChangeDescription(
   const anthropic = getClient();
 
   const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 256,
+    model: CLAUDE_MODEL,
+    max_tokens: 2048,
     system: CHANGE_DESCRIPTION_PROMPT,
     messages: [
       {
@@ -133,6 +134,6 @@ export async function generateChangeDescription(
   });
 
   const text =
-    message.content[0].type === "text" ? message.content[0].text : "";
+    replyText(message);
   return text.trim();
 }
